@@ -921,7 +921,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 	struct rockchip_buffer *buf;
 	struct drm_gem_close args;
 #if  !RK_DRM_GRALLOC
-        int ret, cpp, pitch;
+        int ret, cpp, pitch, aligned_width, aligned_height;
         uint32_t size, gem_handle;
 #else
 	int ret;
@@ -1233,12 +1233,14 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
                 return NULL;
         }
 
-        gralloc_drm_align_geometry(handle->format,
-                        &handle->width, &handle->height);
+	aligned_width = handle->width;
+	aligned_height = handle->height;
+	gralloc_drm_align_geometry(handle->format,
+			&aligned_width, &aligned_height);
 
-        /* TODO: We need to sort out alignment */
-        pitch = ALIGN(handle->width * cpp, 64);
-        size = handle->height * pitch;
+	/* TODO: We need to sort out alignment */
+	pitch = ALIGN(aligned_width * cpp, 64);
+	size = aligned_height * pitch;
 #endif
 	if (handle->prime_fd >= 0) {
 		ret = drmPrimeFDToHandle(info->fd, handle->prime_fd,

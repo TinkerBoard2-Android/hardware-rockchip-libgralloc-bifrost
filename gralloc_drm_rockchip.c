@@ -1241,6 +1241,18 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 	/* TODO: We need to sort out alignment */
 	pitch = ALIGN(aligned_width * cpp, 64);
 	size = aligned_height * pitch;
+
+	if (handle->format == HAL_PIXEL_FORMAT_YCbCr_420_888) {
+		/*
+		 * WAR for H264 decoder requiring additional space
+		 * at the end of destination buffers.
+		 */
+		uint32_t w_mbs, h_mbs;
+
+		w_mbs = ALIGN(handle->width, 16) / 16;
+		h_mbs = ALIGN(handle->height, 16) / 16;
+		size += 64 * w_mbs * h_mbs;
+	}
 #endif
 	if (handle->prime_fd >= 0) {
 		ret = drmPrimeFDToHandle(info->fd, handle->prime_fd,

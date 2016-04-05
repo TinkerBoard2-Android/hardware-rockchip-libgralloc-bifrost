@@ -30,6 +30,8 @@
 
 #include "gralloc_drm_handle.h"
 
+#define GET_VPU_INTO_FROM_HEAD      0 //zxl: 0:get vpu info from head of handle base  1:get vpu info from end of handle base
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -31,6 +31,22 @@
 extern "C" {
 #endif
 
+typedef enum
+{
+	MALI_YUV_NO_INFO,
+	MALI_YUV_BT601_NARROW,
+	MALI_YUV_BT601_WIDE,
+	MALI_YUV_BT709_NARROW,
+	MALI_YUV_BT709_WIDE
+} mali_gralloc_yuv_info;
+
+typedef enum
+{
+	MALI_DPY_TYPE_UNKNOWN = 0,
+	MALI_DPY_TYPE_CLCD,
+	MALI_DPY_TYPE_HDLCD
+} mali_dpy_type;
+
 struct gralloc_drm_bo_t;
 
 struct gralloc_drm_handle_t {
@@ -38,6 +54,26 @@ struct gralloc_drm_handle_t {
 
 	/* file descriptors */
 	int prime_fd;
+
+        mali_dpy_type dpy_type;
+#if MALI_AFBC_GRALLOC == 1
+	int     share_attr_fd;
+#endif
+
+        uint64_t   internal_format;
+        int        internalWidth;
+        int        internalHeight;
+        int        byte_stride;
+
+#if MALI_AFBC_GRALLOC == 1
+	// locally mapped shared attribute area
+	union {
+		void*    attr_base;
+		uint64_t padding3;
+	};
+#endif
+
+	mali_gralloc_yuv_info yuv_info;
 
 	/* integers */
 	int magic;
@@ -57,7 +93,7 @@ struct gralloc_drm_handle_t {
 	int data_owner; /* owner of data (for validation) */
 };
 #define GRALLOC_DRM_HANDLE_MAGIC 0x12345678
-#define GRALLOC_DRM_HANDLE_NUM_FDS 1
+#define GRALLOC_DRM_HANDLE_NUM_FDS 2
 #define GRALLOC_DRM_HANDLE_NUM_INTS (						\
 	((sizeof(struct gralloc_drm_handle_t) - sizeof(native_handle_t))/sizeof(int))	\
 	 - GRALLOC_DRM_HANDLE_NUM_FDS)

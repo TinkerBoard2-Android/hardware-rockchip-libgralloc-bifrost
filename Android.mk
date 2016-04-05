@@ -22,7 +22,7 @@
 # Android.mk for drm_gralloc
 
 DRM_GPU_DRIVERS := $(strip $(filter-out swrast, $(BOARD_GPU_DRIVERS)))
-
+DRM_GPU_DRIVERS := rockchip
 intel_drivers := i915 i965 i915g ilo
 radeon_drivers := r300g r600g
 rockchip_drivers := rockchip
@@ -119,9 +119,40 @@ LOCAL_SHARED_LIBRARIES += libdrm_nouveau
 endif
 
 ifneq ($(filter $(rockchip_drivers), $(DRM_GPU_DRIVERS)),)
-LOCAL_SRC_FILES += gralloc_drm_rockchip.c
-LOCAL_CFLAGS += -DENABLE_ROCKCHIP
+MALI_ARCHITECTURE_UTGARD := 1
+MALI_SUPPORT_AFBC_WIDEBLK?=0
+MALI_AFBC_GRALLOC := 0
+DISABLE_FRAMEBUFFER_HAL?=1
+
+ifeq ($(MALI_ARCHITECTURE_UTGARD),1)
+	 # Utgard build settings
+	MALI_LOCAL_PATH?=hardware/arm/mali
+	GRALLOC_DEPTH?=GRALLOC_32_BITS
+endif
+
+#If cropping should be enabled for AFBC YUV420 buffers
+AFBC_YUV420_EXTRA_MB_ROW_NEEDED = 0
+
+ifeq ($(MALI_AFBC_GRALLOC), 1)
+AFBC_FILES = gralloc_buffer_priv.cpp
+else
+MALI_AFBC_GRALLOC := 0
+AFBC_FILES =
+endif
+
+LOCAL_C_INCLUDES += hardware/rockchip/librkvpu
+LOCAL_SRC_FILES += gralloc_drm_rockchip.c \
+		format_chooser.cpp \
+		format_chooser_blockinit.cpp \
+		$(AFBC_FILES)
+LOCAL_CFLAGS +=-DENABLE_ROCKCHIP -DPLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION) -D$(GRALLOC_DEPTH) -DMALI_ARCHITECTURE_UTGARD=$(MALI_ARCHITECTURE_UTGARD) -DDISABLE_FRAMEBUFFER_HAL=$(DISABLE_FRAMEBUFFER_HAL) -DMALI_AFBC_GRALLOC=$(MALI_AFBC_GRALLOC) -DMALI_SUPPORT_AFBC_WIDEBLK=$(MALI_SUPPORT_AFBC_WIDEBLK) -DAFBC_YUV420_EXTRA_MB_ROW_NEEDED=$(AFBC_YUV420_EXTRA_MB_ROW_NEEDED)
+
+ifeq ($(GRALLOC_FB_SWAP_RED_BLUE),1)
+LOCAL_CFLAGS += -DGRALLOC_FB_SWAP_RED_BLUE
+endif
+
 LOCAL_SHARED_LIBRARIES += libdrm_rockchip
+
 endif
 
 ifeq ($(strip $(DRM_USES_PIPE)),true)

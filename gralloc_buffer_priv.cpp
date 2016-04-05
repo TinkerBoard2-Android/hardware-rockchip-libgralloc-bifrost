@@ -19,8 +19,8 @@
 #include <cutils/ashmem.h>
 #include <cutils/log.h>
 #include <sys/mman.h>
-#include "gralloc_drm_handle.h.h"
-
+#include "gralloc_drm_handle.h"
+#include "gralloc_buffer_priv.h"
 
 /*
  * Allocate shared memory for attribute storage. Only to be

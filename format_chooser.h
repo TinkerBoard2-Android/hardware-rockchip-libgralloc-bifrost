@@ -21,7 +21,6 @@
 
 #include <hardware/hardware.h>
 
-
 #define GRALLOC_ARM_INTFMT_EXTENSION_BIT_START     32
 
 /* This format will be use AFBC */
@@ -162,6 +161,7 @@ typedef struct
 } internal_fmt_info;
 
 
+
 struct hwblk
 {
 	uint32_t usage;
@@ -185,6 +185,7 @@ extern uint32_t blklist_array_size;
 extern "C"
 {
 #endif
+        uint64_t gralloc_select_format(int req_format, int usage);
 	int gralloc_get_internal_format(int hal_format);
 	void *gralloc_get_internal_info(int *blkconf_size, int *gpu_conf);
 #ifdef __cplusplus

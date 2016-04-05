@@ -10,6 +10,8 @@
 #include "gralloc_drm_priv.h"
 #include "format_chooser.h"
 #include "vpu_global.h"
+#include "gralloc_buffer_priv.h"
+
 
 #define UNUSED(...) (void)(__VA_ARGS__)
 
@@ -55,7 +57,8 @@ typedef int bool;
 #define true 1
 #define false 0
 
-extern uint64_t gralloc_select_format(int req_format, int usage);
+static void drm_gem_rockchip_free(struct gralloc_drm_drv_t *drv,
+		struct gralloc_drm_bo_t *bo);
 
 static void drm_gem_rockchip_destroy(struct gralloc_drm_drv_t *drv)
 {
@@ -661,7 +664,6 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		struct gralloc_drm_drv_t *drv,
 		struct gralloc_drm_handle_t *handle)
 {
-
 	struct rockchip_info *info = (struct rockchip_info *)drv;
 	struct rockchip_buffer *buf;
 	struct drm_gem_close args;
@@ -933,7 +935,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		else
 		{
 			drm_gem_rockchip_free( drv, &buf->base );
-			return err;
+			return NULL;
 		}
 	}
 #endif
@@ -960,6 +962,8 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
         handle->stride = pixel_stride;
         handle->byte_stride = byte_stride;
         handle->format = format;
+        handle->size = size;
+        handle->offset = 0;
         handle->internalWidth = internalWidth;
         handle->internalHeight = internalHeight;
         handle->internal_format = internal_format;
@@ -979,11 +983,19 @@ static void drm_gem_rockchip_free(struct gralloc_drm_drv_t *drv,
 		struct gralloc_drm_bo_t *bo)
 {
 	struct rockchip_buffer *buf = (struct rockchip_buffer *)bo;
+        struct gralloc_drm_handle_t *gr_handle = gralloc_drm_handle((buffer_handle_t)bo->handle);
 
 	UNUSED(drv);
 
-	if (bo->handle && bo->handle->prime_fd)
-		close(bo->handle->prime_fd);
+        if (!gr_handle)
+                return;
+
+#if MALI_AFBC_GRALLOC == 1
+	gralloc_buffer_attr_free( gr_handle );
+#endif
+
+	if (gr_handle->prime_fd)
+		close(gr_handle->prime_fd);
 
 	/* TODO: Is destroy correct here? */
 	rockchip_bo_destroy(buf->bo);

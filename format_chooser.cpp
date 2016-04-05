@@ -87,7 +87,6 @@ static inline int find_format_index(int format)
 /*
  * Define GRALLOC_ARM_FORMAT_SELECTION_DISABLE to disable the format selection completely
  */
-extern "C" uint64_t gralloc_select_format(int req_format, int usage);
 uint64_t gralloc_select_format(int req_format, int usage)
 {
 #if defined(GRALLOC_ARM_FORMAT_SELECTION_DISABLE)

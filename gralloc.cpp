@@ -32,6 +32,8 @@
 #include "gralloc_drm.h"
 #include "gralloc_drm_priv.h"
 
+#define UNUSED(...) (void)(__VA_ARGS__)
+
 /*
  * Initialize the DRM device object
  */
@@ -94,6 +96,7 @@ static int drm_mod_register_buffer(const gralloc_module_t *mod,
 static int drm_mod_unregister_buffer(const gralloc_module_t *mod,
 		buffer_handle_t handle)
 {
+    UNUSED(mod);
 	return gralloc_drm_handle_unregister(handle);
 }
 
@@ -103,6 +106,7 @@ static int drm_mod_lock(const gralloc_module_t *mod, buffer_handle_t handle,
 	struct gralloc_drm_bo_t *bo;
 	int err;
 
+    UNUSED(mod);
 	bo = gralloc_drm_bo_from_handle(handle);
 	if (!bo)
 		return -EINVAL;

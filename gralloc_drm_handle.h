@@ -24,8 +24,10 @@
 #ifndef _GRALLOC_DRM_HANDLE_H_
 #define _GRALLOC_DRM_HANDLE_H_
 
+#include <system/window.h>
 #include <cutils/native_handle.h>
 #include <system/graphics.h>
+#include "format_chooser.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -64,6 +66,12 @@ struct gralloc_drm_handle_t {
         int        internalWidth;
         int        internalHeight;
         int        byte_stride;
+        int        size;
+
+        union {
+                off_t    offset;
+                uint64_t padding4;
+        };
 
 #if MALI_AFBC_GRALLOC == 1
 	// locally mapped shared attribute area

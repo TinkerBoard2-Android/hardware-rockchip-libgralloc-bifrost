@@ -10,8 +10,10 @@
 #include "gralloc_drm_priv.h"
 #include "format_chooser.h"
 #include "vpu_global.h"
-#include "gralloc_buffer_priv.h"
 
+#if MALI_AFBC_GRALLOC == 1
+#include "gralloc_buffer_priv.h"
+#endif
 
 #define UNUSED(...) (void)(__VA_ARGS__)
 

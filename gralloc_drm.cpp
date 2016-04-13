@@ -238,11 +238,13 @@ static struct gralloc_drm_handle_t *create_bo_handle(int width,
 	handle->usage = usage;
 	handle->prime_fd = -1;
 
+#ifdef RK_GRALLOC
 #if MALI_AFBC_GRALLOC == 1
 	handle->share_attr_fd = -1;
 	handle->attr_base = MAP_FAILED;
 #endif
     handle->yuv_info = MALI_YUV_NO_INFO;
+#endif
 
 	return handle;
 }

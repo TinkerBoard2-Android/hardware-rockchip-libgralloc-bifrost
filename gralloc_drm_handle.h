@@ -105,7 +105,7 @@ struct gralloc_drm_handle_t {
 	int data_owner; /* owner of data (for validation) */
 };
 #define GRALLOC_DRM_HANDLE_MAGIC 0x12345678
-#if RK_DRM_GRALLOC
+#if MALI_AFBC_GRALLOC == 1
 #define GRALLOC_DRM_HANDLE_NUM_FDS 2
 #else
 #define GRALLOC_DRM_HANDLE_NUM_FDS 1

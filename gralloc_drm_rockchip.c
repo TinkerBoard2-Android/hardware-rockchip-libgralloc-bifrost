@@ -8,13 +8,13 @@
 
 #include "gralloc_drm.h"
 #include "gralloc_drm_priv.h"
-#ifdef RK_GRALLOC
+#if RK_DRM_GRALLOC
 #include "format_chooser.h"
 #include "vpu_global.h"
 #if MALI_AFBC_GRALLOC == 1
 #include "gralloc_buffer_priv.h"
 #endif //end of MALI_AFBC_GRALLOC
-#endif //end of RK_GRALLOC
+#endif //end of RK_DRM_GRALLOC
 
 #define UNUSED(...) (void)(__VA_ARGS__)
 
@@ -31,7 +31,7 @@ struct rockchip_buffer {
 	struct rockchip_bo *bo;
 };
 
-#ifdef RK_GRALLOC
+#if RK_DRM_GRALLOC
 #ifndef AWAR
 #define AWAR(fmt, args...) __android_log_print(ANDROID_LOG_WARN, "[Gralloc-Warning]", "%s:%d " fmt,__func__,__LINE__,##args)
 #endif
@@ -672,7 +672,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 	struct rockchip_info *info = (struct rockchip_info *)drv;
 	struct rockchip_buffer *buf;
 	struct drm_gem_close args;
-#ifndef RK_GRALLOC
+#if  !RK_DRM_GRALLOC
         int ret, cpp, pitch;
         uint32_t size, gem_handle;
 #else
@@ -879,10 +879,10 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 #endif //end of GRALLOC_16_BITS
 	}
 #endif //end of MALI_ARCHITECTURE_UTGARD
-#endif //end of RK_GRALLOC
+#endif //end of RK_DRM_GRALLOC
 	buf = calloc(1, sizeof(*buf));
 	if (!buf) {
-#ifdef RK_GRALLOC
+#if RK_DRM_GRALLOC
 		AERR("Failed to allocate buffer wrapper\n");
 #else
                 ALOGE("Failed to allocate buffer wrapper\n");
@@ -890,7 +890,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		return NULL;
 	}
 
-#ifndef RK_GRALLOC
+#ifndef RK_DRM_GRALLOC
         cpp = gralloc_drm_get_bpp(handle->format);
         if (!cpp) {
                 ALOGE("unrecognized format 0x%x", handle->format);
@@ -914,7 +914,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 			*c = 0;
 			goto err;
 		}
-#ifdef RK_GRALLOC
+#if RK_DRM_GRALLOC
 		AINF("Got handle %d for fd %d\n", gem_handle, handle->prime_fd);
 #else
                 ALOGV("Got handle %d for fd %d\n", gem_handle, handle->prime_fd);
@@ -922,7 +922,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		buf->bo = rockchip_bo_from_handle(info->rockchip, gem_handle,
 			0, size);
 		if (!buf->bo) {
-#ifdef RK_GRALLOC
+#if RK_DRM_GRALLOC
 			AERR("failed to wrap bo handle=%d size=%zd\n",
 				gem_handle, size);
 #else
@@ -937,7 +937,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 	} else {
 		buf->bo = rockchip_bo_create(info->rockchip, size, 0);
 		if (!buf->bo) {
-#ifdef RK_GRALLOC
+#if RK_DRM_GRALLOC
 			AERR("failed to allocate bo %dx%dx%dx%zd\n",
 				handle->height, pixel_stride,byte_stride, size);
 #else
@@ -950,13 +950,13 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		gem_handle = rockchip_bo_handle(buf->bo);
 		ret = drmPrimeHandleToFD(info->fd, gem_handle, 0,
 			&handle->prime_fd);
-#ifdef RK_GRALLOC
+#if RK_DRM_GRALLOC
                 AINF("Got fd %d for handle %d\n", handle->prime_fd, gem_handle);
 #else
 		ALOGV("Got fd %d for handle %d\n", handle->prime_fd, gem_handle);
 #endif
 		if (ret) {
-#ifdef RK_GRALLOC
+#if RK_DRM_GRALLOC
 			AERR("failed to get prime fd %d", ret);
 #else
                         ALOGE("failed to get prime fd %d", ret);
@@ -967,7 +967,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		buf->base.fb_handle = gem_handle;
 	}
 
-#ifdef RK_GRALLOC
+#if RK_DRM_GRALLOC
 #if MALI_AFBC_GRALLOC == 1
 	err = gralloc_buffer_attr_allocate( handle );
 	//ALOGD("err=%d,isfb=%x,[%d,%x]",err,usage & GRALLOC_USAGE_HW_FB,hnd->share_attr_fd,hnd->attr_base);
@@ -1040,7 +1040,7 @@ static void drm_gem_rockchip_free(struct gralloc_drm_drv_t *drv,
         if (!gr_handle)
                 return;
 
-#ifdef RK_GRALLOC
+#if RK_DRM_GRALLOC
 #if MALI_AFBC_GRALLOC == 1
 	gralloc_buffer_attr_free( gr_handle );
 #endif

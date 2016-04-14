@@ -33,7 +33,7 @@
 extern "C" {
 #endif
 
-#ifdef RK_GRALLOC
+#if RK_DRM_GRALLOC
 typedef enum
 {
 	MALI_YUV_NO_INFO,
@@ -59,7 +59,7 @@ struct gralloc_drm_handle_t {
 	/* file descriptors */
 	int prime_fd;
 
-#ifdef RK_GRALLOC
+#if RK_DRM_GRALLOC
         mali_dpy_type dpy_type;
 #if MALI_AFBC_GRALLOC == 1
 	int     share_attr_fd;
@@ -105,7 +105,7 @@ struct gralloc_drm_handle_t {
 	int data_owner; /* owner of data (for validation) */
 };
 #define GRALLOC_DRM_HANDLE_MAGIC 0x12345678
-#ifdef RK_GRALLOC
+#if RK_DRM_GRALLOC
 #define GRALLOC_DRM_HANDLE_NUM_FDS 2
 #else
 #define GRALLOC_DRM_HANDLE_NUM_FDS 1

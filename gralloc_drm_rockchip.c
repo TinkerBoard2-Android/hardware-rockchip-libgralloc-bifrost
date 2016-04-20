@@ -890,7 +890,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		return NULL;
 	}
 
-#ifndef RK_DRM_GRALLOC
+#if !RK_DRM_GRALLOC
         cpp = gralloc_drm_get_bpp(handle->format);
         if (!cpp) {
                 ALOGE("unrecognized format 0x%x", handle->format);
@@ -1019,7 +1019,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 #endif
         handle->name = 0;
 	buf->base.handle = handle;
-
+AINF("leave, w : %d, h : %d, format : 0x%x,internal_format : 0x%x, usage : 0x%x.", handle->width, handle->height, handle->format,internal_format, handle->usage);
 	return &buf->base;
 
 err_unref:

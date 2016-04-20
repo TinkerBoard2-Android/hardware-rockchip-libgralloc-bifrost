@@ -83,7 +83,7 @@ static inline int find_format_index(int format)
 	return index;
 }
 
-// #define GRALLOC_ARM_FORMAT_SELECTION_DISABLE 
+ #define GRALLOC_ARM_FORMAT_SELECTION_DISABLE
 /*
  * Define GRALLOC_ARM_FORMAT_SELECTION_DISABLE to disable the format selection completely
  */

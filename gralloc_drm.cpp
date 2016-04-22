@@ -161,7 +161,7 @@ static struct gralloc_drm_bo_t *validate_handle(buffer_handle_t _handle,
 		return NULL;
 
 	/* the buffer handle is passed to a new process */
-	ALOGE("data_owner=%d gralloc_pid=%d data=%p\n", handle->data_owner, gralloc_drm_get_pid(), handle->data);
+	ALOGD_IF(RK_DRM_GRALLOC_DEBUG,"data_owner=%d gralloc_pid=%d data=%p\n", handle->data_owner, gralloc_drm_get_pid(), handle->data);
 	if (unlikely(handle->data_owner != gralloc_drm_pid)) {
 		struct gralloc_drm_bo_t *bo;
 
@@ -169,8 +169,7 @@ static struct gralloc_drm_bo_t *validate_handle(buffer_handle_t _handle,
 		if (!drm)
 			return NULL;
 
-		ALOGE("handle: name=%d pfd=%d\n", handle->name,
-			handle->prime_fd);
+		ALOGD_IF(RK_DRM_GRALLOC_DEBUG,"handle: name=%d pfd=%d\n", handle->name,handle->prime_fd);
 		/* create the struct gralloc_drm_bo_t locally */
 		if (handle->name || handle->prime_fd >= 0)
 			bo = drm->drv->alloc(drm->drv, handle);
@@ -245,6 +244,9 @@ static struct gralloc_drm_handle_t *create_bo_handle(int width,
 #endif
     handle->yuv_info = MALI_YUV_NO_INFO;
 #endif
+	ALOGD_IF(RK_DRM_GRALLOC_DEBUG,"create_bo_handle handle: version=%d, numInts=%d, numFds=%d, magic=%x",
+		handle->base.version, handle->base.numInts,
+		handle->base.numFds, handle->magic);
 
 	return handle;
 }

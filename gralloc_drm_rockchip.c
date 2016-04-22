@@ -32,6 +32,7 @@ struct rockchip_buffer {
 };
 
 #if RK_DRM_GRALLOC
+#if RK_DRM_GRALLOC_DEBUG
 #ifndef AWAR
 #define AWAR(fmt, args...) __android_log_print(ANDROID_LOG_WARN, "[Gralloc-Warning]", "%s:%d " fmt,__func__,__LINE__,##args)
 #endif
@@ -41,6 +42,21 @@ struct rockchip_buffer {
 #ifndef ADBG
 #define ADBG(fmt, args...) __android_log_print(ANDROID_LOG_DEBUG, "[Gralloc-DEBUG]", fmt,##args)
 #endif
+
+#else
+
+#ifndef AWAR
+#define AWAR(fmt, args...)
+#endif
+#ifndef AINF
+#define AINF(fmt, args...)
+#endif
+#ifndef ADBG
+#define ADBG(fmt, args...)
+#endif
+
+#endif //end of RK_DRM_GRALLOC_DEBUG
+
 #ifndef AERR
 #define AERR(fmt, args...) __android_log_print(ANDROID_LOG_ERROR, "[Gralloc-ERROR]", "%s:%d " fmt,__func__,__LINE__,##args)
 #endif
@@ -1019,7 +1035,9 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 #endif
         handle->name = 0;
 	buf->base.handle = handle;
-AINF("leave, w : %d, h : %d, format : 0x%x,internal_format : 0x%x, usage : 0x%x.", handle->width, handle->height, handle->format,internal_format, handle->usage);
+
+        AINF("leave, w : %d, h : %d, format : 0x%x,internal_format : 0x%x, usage : 0x%x.", handle->width, handle->height, handle->format,internal_format, handle->usage);
+
 	return &buf->base;
 
 err_unref:

@@ -220,24 +220,26 @@ static struct hw_module_methods_t drm_mod_methods = {
 	.open = drm_mod_open
 };
 
-struct drm_module_t HAL_MODULE_INFO_SYM = {
-	.base = {
-		.common = {
-			.tag = HARDWARE_MODULE_TAG,
-			.version_major = 1,
-			.version_minor = 0,
-			.id = GRALLOC_HARDWARE_MODULE_ID,
-			.name = "DRM Memory Allocator",
-			.author = "Chia-I Wu",
-			.methods = &drm_mod_methods
-		},
-		.registerBuffer = drm_mod_register_buffer,
-		.unregisterBuffer = drm_mod_unregister_buffer,
-		.lock = drm_mod_lock,
-		.unlock = drm_mod_unlock,
-		.perform = drm_mod_perform
-	},
+drm_module_t::drm_module_t()
+{
+    base.common.tag = HARDWARE_MODULE_TAG;
+    base.common.version_major = 1;
+    base.common.version_minor = 0;
+    base.common.id = GRALLOC_HARDWARE_MODULE_ID;
+    base.common.name = "DRM Memory Allocator";
+    base.common.author = "Chia-I Wu";
+    base.common.methods = &drm_mod_methods;
 
-	.mutex = PTHREAD_MUTEX_INITIALIZER,
-	.drm = NULL
-};
+    base.registerBuffer = drm_mod_register_buffer;
+    base.unregisterBuffer = drm_mod_unregister_buffer;
+    base.lock = drm_mod_lock;
+    base.unlock = drm_mod_unlock;
+    base.perform = drm_mod_perform;
+
+    mutex = PTHREAD_MUTEX_INITIALIZER;
+    drm = NULL;
+
+    initialize_blk_conf();
+}
+
+struct drm_module_t HAL_MODULE_INFO_SYM;

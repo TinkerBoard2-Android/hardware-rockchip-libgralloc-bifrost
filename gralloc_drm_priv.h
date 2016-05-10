@@ -47,6 +47,10 @@ struct drm_module_t {
 
 	pthread_mutex_t mutex;
 	struct gralloc_drm_t *drm;
+#ifdef __cplusplus
+	/* default constructor */
+	drm_module_t();
+#endif
 };
 
 struct gralloc_drm_drv_t {

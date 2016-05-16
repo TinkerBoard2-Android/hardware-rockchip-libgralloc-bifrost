@@ -29,6 +29,8 @@
 #include <pthread.h>
 #include <errno.h>
 
+#include <vector>
+
 #include "gralloc_drm.h"
 #include "gralloc_drm_priv.h"
 
@@ -69,6 +71,28 @@ static int drm_mod_perform(const struct gralloc_module_t *mod, int op, ...)
 			int *fd = va_arg(args, int *);
 			*fd = gralloc_drm_get_fd(dmod->drm);
 			err = 0;
+		}
+		break;
+	case GRALLOC_MODULE_PERFORM_GET_HADNLE_PRIME_FD:
+		{
+			buffer_handle_t hnd = va_arg(args, buffer_handle_t);
+			int *fd = va_arg(args, int *);
+
+			if (fd > NULL)
+				err = gralloc_drm_handle_get_prime_fd(hnd,fd);
+			else
+				err = -EINVAL;
+		}
+		break;
+	case GRALLOC_MODULE_PERFORM_GET_HADNLE_ATTRIBUTES:
+		{
+			buffer_handle_t hnd = va_arg(args, buffer_handle_t);
+			std::vector<int> *attrs = va_arg(args, std::vector<int> *);
+
+			if (attrs > NULL)
+				err = gralloc_drm_handle_get_attributes(hnd, (void*)attrs);
+			else
+				err = -EINVAL;
 		}
 		break;
 	default:

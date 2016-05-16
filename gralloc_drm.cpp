@@ -33,6 +33,8 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
+#include <vector>
+
 #include "gralloc_drm.h"
 #include "gralloc_drm_priv.h"
 
@@ -185,7 +187,6 @@ static struct gralloc_drm_bo_t *validate_handle(buffer_handle_t _handle,
 		handle->data_owner = gralloc_drm_get_pid();
 		handle->data = bo;
 	}
-
 	return handle->data;
 }
 
@@ -242,7 +243,7 @@ static struct gralloc_drm_handle_t *create_bo_handle(int width,
 	handle->share_attr_fd = -1;
 	handle->attr_base = MAP_FAILED;
 #endif
-    handle->yuv_info = MALI_YUV_NO_INFO;
+	handle->yuv_info = MALI_YUV_NO_INFO;
 #endif
 	ALOGD_IF(RK_DRM_GRALLOC_DEBUG,"create_bo_handle handle: version=%d, numInts=%d, numFds=%d, magic=%x",
 		handle->base.version, handle->base.numInts,
@@ -407,4 +408,48 @@ void gralloc_drm_bo_unlock(struct gralloc_drm_bo_t *bo)
 	bo->lock_count--;
 	if (!bo->lock_count)
 		bo->locked_for = 0;
+}
+
+int gralloc_drm_handle_get_prime_fd(buffer_handle_t _handle, int *fd)
+{
+	int ret = 0;
+	struct gralloc_drm_handle_t *handle = gralloc_drm_handle(_handle);
+
+	if (!handle)
+		return -EINVAL;
+
+	if (unlikely(handle->data_owner != gralloc_drm_pid)) {
+		ret = -EPERM;
+		ALOGE("handle get prime fd before register buffer.");
+	} else {
+		ret = 0;
+		*fd = handle->prime_fd;
+	}
+
+	return ret;
+}
+
+int gralloc_drm_handle_get_attributes(buffer_handle_t _handle, void *attrs)
+{
+	int ret = 0;
+	struct gralloc_drm_handle_t *handle = gralloc_drm_handle(_handle);
+	std::vector<int> *attributes = (std::vector<int> *)attrs;
+
+	if (!handle)
+		return -EINVAL;
+
+	if (unlikely(handle->data_owner != gralloc_drm_pid)) {
+		ret = -EPERM;
+		ALOGE("handle get attributes before register buffer.");
+	} else {
+		ret = 0;
+		attributes->clear();
+		attributes->push_back(handle->width);
+		attributes->push_back(handle->height);
+		attributes->push_back(handle->stride);
+		attributes->push_back(handle->format);
+		attributes->push_back(handle->size);
+	}
+
+	return ret;
 }

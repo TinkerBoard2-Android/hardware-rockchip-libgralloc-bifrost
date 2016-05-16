@@ -38,6 +38,8 @@ struct gralloc_drm_bo_t;
 
 enum {
 	GRALLOC_MODULE_PERFORM_GET_DRM_FD                = 0x80000002,
+	GRALLOC_MODULE_PERFORM_GET_HADNLE_PRIME_FD       = 0x81000002,
+	GRALLOC_MODULE_PERFORM_GET_HADNLE_ATTRIBUTES     = 0x81000004,
 };
 
 struct gralloc_drm_t *gralloc_drm_create(void);
@@ -122,6 +124,9 @@ unsigned int planes_for_format(struct gralloc_drm_t *drm, int hal_format);
 int gralloc_drm_bo_lock(struct gralloc_drm_bo_t *bo, int x, int y, int w, int h, int enable_write, void **addr);
 void gralloc_drm_bo_unlock(struct gralloc_drm_bo_t *bo);
 
+int gralloc_drm_handle_get_prime_fd(buffer_handle_t _handle, int *fd);
+
+int gralloc_drm_handle_get_attributes(buffer_handle_t _handle, void *attrs);
 #ifdef __cplusplus
 }
 #endif

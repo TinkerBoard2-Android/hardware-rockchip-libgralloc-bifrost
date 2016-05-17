@@ -65,6 +65,7 @@ static inline int gralloc_drm_get_bpp(int format)
 		bpp = 2;
 		break;
 	/* planar; only Y is considered */
+	case HAL_PIXEL_FORMAT_YCrCb_NV12:
 	case HAL_PIXEL_FORMAT_YV12:
 	case HAL_PIXEL_FORMAT_YCbCr_422_SP:
 	case HAL_PIXEL_FORMAT_YCrCb_420_SP:

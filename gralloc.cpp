@@ -194,8 +194,9 @@ static int drm_mod_alloc_gpu0(alloc_device_t *dev,
 		return -ENOMEM;
 
 	*handle = gralloc_drm_bo_get_handle(bo, stride);
+	//It is no need this operation since stide is already in pixels.
 	/* in pixels */
-	*stride /= bpp;
+//	*stride /= bpp;
 
 	return 0;
 }

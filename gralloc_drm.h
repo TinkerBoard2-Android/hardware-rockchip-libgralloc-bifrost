@@ -40,6 +40,7 @@ enum {
 	GRALLOC_MODULE_PERFORM_GET_DRM_FD                = 0x80000002,
 	GRALLOC_MODULE_PERFORM_GET_HADNLE_PRIME_FD       = 0x81000002,
 	GRALLOC_MODULE_PERFORM_GET_HADNLE_ATTRIBUTES     = 0x81000004,
+	GRALLOC_MODULE_PERFORM_GET_USAGE                 = 0xffeeff03,
 };
 
 struct gralloc_drm_t *gralloc_drm_create(void);
@@ -128,6 +129,9 @@ void gralloc_drm_bo_unlock(struct gralloc_drm_bo_t *bo);
 int gralloc_drm_handle_get_prime_fd(buffer_handle_t _handle, int *fd);
 
 int gralloc_drm_handle_get_attributes(buffer_handle_t _handle, void *attrs);
+
+int gralloc_drm_handle_get_usage(buffer_handle_t _handle, int *usage);
+
 #ifdef __cplusplus
 }
 #endif

@@ -95,6 +95,17 @@ static int drm_mod_perform(const struct gralloc_module_t *mod, int op, ...)
 				err = -EINVAL;
 		}
 		break;
+    case GRALLOC_MODULE_PERFORM_GET_USAGE:
+        {
+            buffer_handle_t hnd = va_arg(args, buffer_handle_t);
+            int *usage = va_arg(args, int *);
+
+            if(usage > NULL)
+                err = gralloc_drm_handle_get_usage(hnd, usage);
+            else
+                err = -EINVAL;
+        }
+        break;
 	default:
 		err = -EINVAL;
 		break;

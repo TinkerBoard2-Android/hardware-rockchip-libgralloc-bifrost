@@ -453,3 +453,22 @@ int gralloc_drm_handle_get_attributes(buffer_handle_t _handle, void *attrs)
 
 	return ret;
 }
+
+int gralloc_drm_handle_get_usage(buffer_handle_t _handle, int *usage)
+{
+	int ret = 0;
+	struct gralloc_drm_handle_t *handle = gralloc_drm_handle(_handle);
+
+	if (!handle)
+		return -EINVAL;
+
+	if (unlikely(handle->data_owner != gralloc_drm_pid)) {
+		ret = -EPERM;
+		ALOGE("handle get usage before register buffer.");
+	} else {
+		ret = 0;
+		*usage = handle->usage;
+	}
+
+	return ret;
+}

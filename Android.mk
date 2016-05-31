@@ -131,7 +131,7 @@ ifeq ($(MALI_ARCHITECTURE_UTGARD),1)
 endif
 
 #If cropping should be enabled for AFBC YUV420 buffers
-AFBC_YUV420_EXTRA_MB_ROW_NEEDED = 0
+AFBC_YUV420_EXTRA_MB_ROW_NEEDED ?= 0
 
 ifeq ($(MALI_AFBC_GRALLOC), 1)
 AFBC_FILES = gralloc_buffer_priv.cpp

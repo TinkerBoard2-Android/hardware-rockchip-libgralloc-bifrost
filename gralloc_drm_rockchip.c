@@ -73,6 +73,10 @@ struct rockchip_buffer {
 #define AFBC_HEADER_BUFFER_BYTES_PER_BLOCKENTRY  16
 #define AFBC_WIDEBLK_WIDTH_ALIGN                 32
 
+// This value is platform specific and should be set according to hardware YUV planes restrictions.
+// Please note that EGL winsys platform config file needs to use the same value when importing buffers.
+#define YUV_PLANE_ALIGN 128
+
 typedef int bool;
 #define true 1
 #define false 0
@@ -200,13 +204,17 @@ static bool get_afbc_yuv420_8bit_stride_and_size(int width, int height, int* pix
 	{
 		width = GRALLOC_ALIGN(width, AFBC_PIXELS_PER_BLOCK);
 	}
-	height = GRALLOC_ALIGN(height, AFBC_PIXELS_PER_BLOCK);
 
 #if AFBC_YUV420_EXTRA_MB_ROW_NEEDED
 	/* If we have a greater internal height than public we set the internalHeight. This
 	 * implies that cropping will be applied of internal dimensions to fit the public one. */
 	*internalHeight += AFBC_PIXELS_PER_BLOCK;
 #endif
+
+        /* The actual height used in size calculation must include the possible extra row. But
+         * it must also be AFBC-aligned. Only the extra row-padding should be reported back in
+         * internalHeight. This as only this row needs to be considered when cropping. */
+        height = GRALLOC_ALIGN( *internalHeight, AFBC_PIXELS_PER_BLOCK );
 
 	yuv420_afbc_luma_stride = width;
 	yuv420_afbc_chroma_stride = GRALLOC_ALIGN(yuv420_afbc_luma_stride / 2, 16); /* Horizontal downsampling*/
@@ -215,9 +223,9 @@ static bool get_afbc_yuv420_8bit_stride_and_size(int width, int height, int* pix
 	{
 		int nblocks = width / AFBC_PIXELS_PER_BLOCK * height / AFBC_PIXELS_PER_BLOCK;
 		/* Simplification of (height * luma-stride + 2 * (height /2 * chroma_stride) */
-		*size = (yuv420_afbc_luma_stride + yuv420_afbc_chroma_stride) * height
-			+ GRALLOC_ALIGN(nblocks * AFBC_HEADER_BUFFER_BYTES_PER_BLOCKENTRY, AFBC_BODY_BUFFER_BYTE_ALIGNMENT);
-	}
+                *size =
+                    ( yuv420_afbc_luma_stride + yuv420_afbc_chroma_stride ) * height +
+                    GRALLOC_ALIGN( nblocks * AFBC_HEADER_BUFFER_BYTES_PER_BLOCKENTRY, AFBC_BODY_BUFFER_BYTE_ALIGNMENT );	}
 
 	if (byte_stride != NULL)
 	{
@@ -261,12 +269,11 @@ static bool get_yv12_stride_and_size(int width, int height,
 		return get_afbc_yuv420_8bit_stride_and_size(width, height, pixel_stride, byte_stride, size, type, internalHeight);
 	}
 	
-	/* Android assumes the buffer should be aligned to 16. */
-	luma_stride = GRALLOC_ALIGN(width, 16);
+	luma_stride = GRALLOC_ALIGN(width, YUV_PLANE_ALIGN);
 
 	if (size != NULL)
 	{
-		int chroma_stride = GRALLOC_ALIGN(luma_stride / 2, 16);
+		int chroma_stride = GRALLOC_ALIGN(luma_stride / 2, YUV_PLANE_ALIGN);
 		/* Simplification of ((height * luma_stride ) + 2 * ((height / 2) * chroma_stride)). */
 		*size = height * (luma_stride + chroma_stride);
 	}
@@ -377,12 +384,12 @@ static bool get_yuv_pX10_stride_and_size(int width, int height, int vss, int* pi
 		return false;
 	}
 
-	luma_pixel_stride = GRALLOC_ALIGN(width, 16);
-	luma_byte_stride  = GRALLOC_ALIGN(width * 2, 16);
+	luma_pixel_stride = GRALLOC_ALIGN(width, YUV_PLANE_ALIGN);
+	luma_byte_stride  = GRALLOC_ALIGN(width * 2, YUV_PLANE_ALIGN);
 
 	if (size != NULL)
 	{
-		int chroma_size = GRALLOC_ALIGN(width * 2, 16) * (height / vss);
+		int chroma_size = GRALLOC_ALIGN(width * 2, YUV_PLANE_ALIGN) * (height / vss);
 		*size = luma_byte_stride * height + chroma_size;
 	}
 
@@ -423,8 +430,8 @@ static bool get_yuv_y210_stride_and_size(int width, int height, int* pixel_strid
 		return false;
 	}
 
-	y210_pixel_stride = GRALLOC_ALIGN(width, 16);
-	y210_byte_stride  = GRALLOC_ALIGN(width * 4, 16);
+	y210_pixel_stride = GRALLOC_ALIGN(width, YUV_PLANE_ALIGN);
+	y210_byte_stride  = GRALLOC_ALIGN(width * 4, YUV_PLANE_ALIGN);
 
 	if (size != NULL)
 	{
@@ -469,8 +476,8 @@ static bool get_yuv_y0l2_stride_and_size(int width, int height, int* pixel_strid
 		return false;
 	}
 
-	y0l2_pixel_stride = GRALLOC_ALIGN(width * 4, 16); /* 4 pixels packed per line */
-	y0l2_byte_stride  = GRALLOC_ALIGN(width * 4, 16); /* Packed in 64-bit chunks, 2 x downsampled horizontally */
+	y0l2_pixel_stride = GRALLOC_ALIGN(width * 4, YUV_PLANE_ALIGN); /* 4 pixels packed per line */
+	y0l2_byte_stride  = GRALLOC_ALIGN(width * 4, YUV_PLANE_ALIGN); /* Packed in 64-bit chunks, 2 x downsampled horizontally */
 
 	if (size != NULL)
 	{
@@ -509,8 +516,8 @@ static bool get_yuv_y410_stride_and_size(int width, int height, int* pixel_strid
 {
 	int y410_byte_stride, y410_pixel_stride;
 
-	y410_pixel_stride = GRALLOC_ALIGN(width, 16);
-	y410_byte_stride  = GRALLOC_ALIGN(width * 4, 16);
+	y410_pixel_stride = GRALLOC_ALIGN(width, YUV_PLANE_ALIGN);
+	y410_byte_stride  = GRALLOC_ALIGN(width * 4, YUV_PLANE_ALIGN);
 
 	if (size != NULL)
 	{

@@ -49,6 +49,32 @@ typedef enum
 	MALI_DPY_TYPE_CLCD,
 	MALI_DPY_TYPE_HDLCD
 } mali_dpy_type;
+
+
+#if 0
+#if MALI_PRODUCT_ID_T86X != 1 \
+    && MALI_PRODUCT_ID_T76X != 1 \
+    && MALI_PRODUCT_ID_T72X != 1
+#error "we must define MALI_PRODUCT_ID_TXXX for current Mali GPU."
+#endif
+
+#ifndef MALI_AFBC_GRALLOC
+#error "we must config MALI_AFBC_GRALLOC explicitly."
+#endif
+
+#if MALI_PRODUCT_ID_T86X == 1 && MALI_AFBC_GRALLOC != 1
+#error "we must enable AFBC for mali-t860."
+#endif
+
+#if MALI_PRODUCT_ID_T76X == 1 && MALI_AFBC_GRALLOC != 1
+#error "we must NOT enable AFBC for mali-t760."
+#endif
+
+#if MALI_PRODUCT_ID_T72X == 1 && MALI_AFBC_GRALLOC != 0
+#error "we must NOT enable AFBC for mali-t720."
+#endif
+#endif
+
 #endif
 
 struct gralloc_drm_bo_t;

@@ -33,6 +33,7 @@
 
 #include "gralloc_drm.h"
 #include "gralloc_drm_priv.h"
+#include "gralloc_drm_handle.h"
 
 #define UNUSED(...) (void)(__VA_ARGS__)
 
@@ -148,6 +149,75 @@ static int drm_mod_lock(const gralloc_module_t *mod, buffer_handle_t handle,
 
 	return gralloc_drm_bo_lock(bo, usage, x, y, w, h, ptr);
 }
+
+#define GRALLOC_ALIGN( value, base ) (((value) + ((base) - 1)) & ~((base) - 1))
+static int gralloc_lock_ycbcr(gralloc_module_t const* module, buffer_handle_t handle, int usage,
+                              int l, int t, int w, int h,
+                              android_ycbcr *ycbcr)
+{
+	if (gralloc_drm_handle(handle) == 0)
+	{
+		ALOGE("Locking invalid buffer %p, returning error", handle );
+		return -EINVAL;
+	}
+
+	struct gralloc_drm_handle_t* hnd = (struct gralloc_drm_handle_t*)handle;
+
+
+	if (usage & (GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK))
+	{
+		unsigned int *cpu_addr;
+		drm_mod_lock(module,handle,hnd->usage,0,0,hnd->width,hnd->height,(void **)&cpu_addr);
+
+		int y_stride = hnd->byte_stride;
+		int y_size =  y_stride * hnd->height;
+
+		int u_offset = 0;
+		int v_offset = 0;
+		int c_stride = 0;
+		int step = 0;
+
+		switch (hnd->internal_format & GRALLOC_ARM_INTFMT_FMT_MASK)
+		{
+			case HAL_PIXEL_FORMAT_YCbCr_420_888: /* Internally interpreted as NV12 */
+				c_stride = y_stride;
+				/* Y plane, UV plane */
+				u_offset = y_size;
+				v_offset = y_size + 1;
+				step = 2;
+				break;
+
+			case HAL_PIXEL_FORMAT_YV12:
+			case GRALLOC_ARM_HAL_FORMAT_INDEXED_YV12:
+			{
+				int c_size;
+
+				/* Stride alignment set to 16 as the SW access flags were set */
+				c_stride = GRALLOC_ALIGN(hnd->byte_stride / 2, 16);
+				c_size = c_stride * (hnd->height / 2);
+				/* Y plane, V plane, U plane */
+				v_offset = y_size;
+				u_offset = y_size + c_size;
+				step = 1;
+				break;
+			}
+
+			default:
+				ALOGE("Can't lock buffer %p: wrong format %llx", hnd, hnd->internal_format);
+				return -EINVAL;
+		}
+
+		ycbcr->y = cpu_addr;
+		ycbcr->cb = cpu_addr + u_offset;
+		ycbcr->cr = cpu_addr + v_offset;
+		ycbcr->ystride = y_stride;
+		ycbcr->cstride = c_stride;
+		ycbcr->chroma_step = step;
+	}
+	return 0;
+}
+
+
 
 static int drm_mod_unlock(const gralloc_module_t *mod, buffer_handle_t handle)
 {
@@ -269,6 +339,7 @@ drm_module_t::drm_module_t()
     base.registerBuffer = drm_mod_register_buffer;
     base.unregisterBuffer = drm_mod_unregister_buffer;
     base.lock = drm_mod_lock;
+    base.lock_ycbcr = gralloc_lock_ycbcr;
     base.unlock = drm_mod_unlock;
     base.perform = drm_mod_perform;
 

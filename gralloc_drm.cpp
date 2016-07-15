@@ -217,7 +217,7 @@ int gralloc_drm_handle_unregister(buffer_handle_t handle)
 	if (!bo)
 		return -EINVAL;
 
-    bo->refcount--;
+    gralloc_drm_bo_decref(bo);
 
 	if (bo->imported)
 		gralloc_drm_bo_decref(bo);

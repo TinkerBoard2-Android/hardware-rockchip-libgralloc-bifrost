@@ -97,6 +97,8 @@ struct gralloc_drm_handle_t {
         int        internalHeight;
         int        byte_stride;
         int        size;
+        int        ref;
+        
 
         union {
                 off_t    offset;
@@ -146,11 +148,17 @@ enum
        GRALLOC_ARM_USAGE_NO_AFBC = GRALLOC_USAGE_PRIVATE_1 | GRALLOC_USAGE_PRIVATE_2
 };
 
+static pthread_mutex_t handle_mutex = PTHREAD_MUTEX_INITIALIZER;
 static inline struct gralloc_drm_handle_t *gralloc_drm_handle(buffer_handle_t _handle)
 {
 	struct gralloc_drm_handle_t *handle =
 		(struct gralloc_drm_handle_t *) _handle;
 
+        if(handle)
+        {
+                pthread_mutex_lock(&handle_mutex);
+                handle->ref++;
+        }
 	if (handle && (handle->base.version != sizeof(handle->base) ||
 	               handle->base.numInts != GRALLOC_DRM_HANDLE_NUM_INTS ||
 	               handle->base.numFds != GRALLOC_DRM_HANDLE_NUM_FDS ||
@@ -158,10 +166,25 @@ static inline struct gralloc_drm_handle_t *gralloc_drm_handle(buffer_handle_t _h
 		ALOGE("invalid handle: version=%d, numInts=%d, numFds=%d, magic=%x",
 			handle->base.version, handle->base.numInts,
 			handle->base.numFds, handle->magic);
+	        ALOGE("invalid handle: right version=%d, numInts=%d, numFds=%d, magic=%x",
+	                sizeof(handle->base),GRALLOC_DRM_HANDLE_NUM_INTS,GRALLOC_DRM_HANDLE_NUM_FDS,
+	                GRALLOC_DRM_HANDLE_MAGIC);
 		handle = NULL;
 	}
 
 	return handle;
+}
+
+static inline void gralloc_drm_unlock_handle(buffer_handle_t _handle)
+{
+	struct gralloc_drm_handle_t *handle =
+		(struct gralloc_drm_handle_t *) _handle;
+
+        if(handle)
+        {
+                handle->ref--;
+                pthread_mutex_unlock(&handle_mutex);
+        }
 }
 
 #ifdef __cplusplus

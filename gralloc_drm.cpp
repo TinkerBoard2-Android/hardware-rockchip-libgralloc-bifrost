@@ -42,6 +42,8 @@
 
 static int32_t gralloc_drm_pid = 0;
 
+static pthread_mutex_t bo_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 /*
  * Return the pid of the process.
  */
@@ -169,7 +171,10 @@ static struct gralloc_drm_bo_t *validate_handle(buffer_handle_t _handle,
 
 		/* check only */
 		if (!drm)
+		{
+		    gralloc_drm_unlock_handle(_handle);
 			return NULL;
+		}
 
 		ALOGD_IF(RK_DRM_GRALLOC_DEBUG,"handle: name=%d pfd=%d\n", handle->name,handle->prime_fd);
 		/* create the struct gralloc_drm_bo_t locally */
@@ -187,6 +192,7 @@ static struct gralloc_drm_bo_t *validate_handle(buffer_handle_t _handle,
 		handle->data_owner = gralloc_drm_get_pid();
 		handle->data = bo;
 	}
+	gralloc_drm_unlock_handle(_handle);
 	return handle->data;
 }
 
@@ -197,11 +203,15 @@ int gralloc_drm_handle_register(buffer_handle_t handle, struct gralloc_drm_t *dr
 {
     struct gralloc_drm_bo_t *bo;
 
+	pthread_mutex_lock(&bo_mutex);
     bo = validate_handle(handle, drm);
-    if (!bo)
+    if (!bo) {
+	pthread_mutex_unlock(&bo_mutex);
         return -EINVAL;
+    }
 
     bo->refcount++;
+	pthread_mutex_unlock(&bo_mutex);
 
 	return 0;
 }
@@ -289,6 +299,7 @@ struct gralloc_drm_bo_t *gralloc_drm_bo_create(struct gralloc_drm_t *drm,
 
 	handle->data_owner = gralloc_drm_get_pid();
 	handle->data = bo;
+	handle->ref = 0;
 
 	return bo;
 }
@@ -311,7 +322,12 @@ static void gralloc_drm_bo_destroy(struct gralloc_drm_bo_t *bo)
 		handle->data = 0;
 	}
 	else {
-		delete handle;
+	    if(!handle->ref)
+		{
+		    delete handle;
+		}
+		else
+		    ALOGE("zxl:gralloc_drm_bo_destroy handle ref=%d",handle->ref);
 	}
 }
 
@@ -320,8 +336,10 @@ static void gralloc_drm_bo_destroy(struct gralloc_drm_bo_t *bo)
  */
 void gralloc_drm_bo_decref(struct gralloc_drm_bo_t *bo)
 {
+	pthread_mutex_lock(&bo_mutex);
 	if (!--bo->refcount)
 		gralloc_drm_bo_destroy(bo);
+	pthread_mutex_unlock(&bo_mutex);
 }
 
 /*
@@ -329,7 +347,26 @@ void gralloc_drm_bo_decref(struct gralloc_drm_bo_t *bo)
  */
 struct gralloc_drm_bo_t *gralloc_drm_bo_from_handle(buffer_handle_t handle)
 {
-	return validate_handle(handle, NULL);
+	struct gralloc_drm_bo_t *bo;
+
+	pthread_mutex_lock(&bo_mutex);
+	bo = validate_handle(handle, NULL);
+	if (bo)
+		bo->refcount++;
+	pthread_mutex_unlock(&bo_mutex);
+	return bo;
+}
+
+int gralloc_drm_free_bo_from_handle(buffer_handle_t handle)
+{
+	struct gralloc_drm_bo_t *bo;
+
+	bo = validate_handle(handle, NULL);
+	if (!bo)
+		return -EINVAL;
+	gralloc_drm_bo_decref(bo);
+
+	return 0;
 }
 
 /*
@@ -356,6 +393,7 @@ void gralloc_drm_resolve_format(buffer_handle_t _handle,
 	if (handle && drm->drv->resolve_format)
 		drm->drv->resolve_format(drm->drv, bo,
 			pitches, offsets, handles);
+    gralloc_drm_unlock_handle(_handle);
 }
 
 /*
@@ -442,6 +480,7 @@ int gralloc_drm_handle_get_prime_fd(buffer_handle_t _handle, int *fd)
 		*fd = handle->prime_fd;
 	}
 
+    gralloc_drm_unlock_handle(_handle);
 	return ret;
 }
 
@@ -466,7 +505,7 @@ int gralloc_drm_handle_get_attributes(buffer_handle_t _handle, void *attrs)
 		attributes->push_back(handle->format);
 		attributes->push_back(handle->size);
 	}
-
+    gralloc_drm_unlock_handle(_handle);
 	return ret;
 }
 
@@ -485,6 +524,7 @@ int gralloc_drm_handle_get_usage(buffer_handle_t _handle, int *usage)
 		ret = 0;
 		*usage = handle->usage;
 	}
+    gralloc_drm_unlock_handle(_handle);
 
 	return ret;
 }

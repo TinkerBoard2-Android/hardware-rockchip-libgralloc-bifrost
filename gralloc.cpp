@@ -143,11 +143,15 @@ static int drm_mod_lock(const gralloc_module_t *mod, buffer_handle_t handle,
 	int err;
 
     UNUSED(mod);
+
 	bo = gralloc_drm_bo_from_handle(handle);
 	if (!bo)
 		return -EINVAL;
 
-	return gralloc_drm_bo_lock(bo, usage, x, y, w, h, ptr);
+	err = gralloc_drm_bo_lock(bo, usage, x, y, w, h, ptr);
+	gralloc_drm_bo_decref(bo);
+
+	return err;
 }
 
 #define GRALLOC_ALIGN( value, base ) (((value) + ((base) - 1)) & ~((base) - 1))
@@ -244,6 +248,7 @@ static int drm_mod_unlock(const gralloc_module_t *mod, buffer_handle_t handle)
 		return -EINVAL;
 
 	gralloc_drm_bo_unlock(bo);
+	gralloc_drm_bo_decref(bo);
 
 	return 0;
 }
@@ -264,13 +269,7 @@ static int drm_mod_free_gpu0(alloc_device_t *dev, buffer_handle_t handle)
 	struct drm_module_t *dmod = (struct drm_module_t *) dev->common.module;
 	struct gralloc_drm_bo_t *bo;
 
-	bo = gralloc_drm_bo_from_handle(handle);
-	if (!bo)
-		return -EINVAL;
-
-	gralloc_drm_bo_decref(bo);
-
-	return 0;
+	return gralloc_drm_free_bo_from_handle(handle);
 }
 
 static int drm_mod_alloc_gpu0(alloc_device_t *dev,

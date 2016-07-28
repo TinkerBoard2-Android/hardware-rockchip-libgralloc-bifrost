@@ -1098,6 +1098,7 @@ static void drm_gem_rockchip_free(struct gralloc_drm_drv_t *drv,
 	if (gr_handle->prime_fd)
 		close(gr_handle->prime_fd);
 #endif
+        gralloc_drm_unlock_handle((buffer_handle_t)bo->handle);
 
 	/* TODO: Is destroy correct here? */
 	rockchip_bo_destroy(buf->bo);

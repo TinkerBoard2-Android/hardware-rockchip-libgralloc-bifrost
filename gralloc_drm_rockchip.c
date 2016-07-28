@@ -752,9 +752,12 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		}
 	}
 
+	/* map format if necessary */
+	uint64_t mapped_format = map_format(internal_format & GRALLOC_ARM_INTFMT_FMT_MASK);
+
 	if (!alloc_for_extended_yuv && !alloc_for_arm_afbc_yuv)
 	{
-		switch (internal_format & GRALLOC_ARM_INTFMT_FMT_MASK)
+		switch (mapped_format)
 		{
 			case HAL_PIXEL_FORMAT_RGBA_8888:
 			case HAL_PIXEL_FORMAT_RGBX_8888:
@@ -777,8 +780,9 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 				break;
 
 			case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-			case HAL_PIXEL_FORMAT_YCbCr_420_888:
 			case HAL_PIXEL_FORMAT_YV12:
+			case GRALLOC_ARM_HAL_FORMAT_INDEXED_NV12:
+			case GRALLOC_ARM_HAL_FORMAT_INDEXED_NV21:
 			{
 				// Mali subsystem prefers higher stride alignment values (128b) for YUV, but software components assume default of 16.
 				// We only need to care about YV12 as it's the only, implicit, HAL YUV format in Android.
@@ -826,7 +830,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 	}
 	else
 	{
-		switch (internal_format & GRALLOC_ARM_INTFMT_FMT_MASK)
+		switch (mapped_format)
 		{
 			case GRALLOC_ARM_HAL_FORMAT_INDEXED_Y0L2:
 				/* YUYAAYUVAA 4:2:0 */

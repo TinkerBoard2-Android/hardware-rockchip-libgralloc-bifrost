@@ -30,7 +30,7 @@
 #include <errno.h>
 
 #include <vector>
-
+#include "gralloc_helper.h"
 #include "gralloc_drm.h"
 #include "gralloc_drm_priv.h"
 #include "gralloc_drm_handle.h"
@@ -177,15 +177,26 @@ static int gralloc_lock_ycbcr(gralloc_module_t const* module, buffer_handle_t ha
 		int c_stride = 0;
 		int step = 0;
 
-		switch (hnd->internal_format & GRALLOC_ARM_INTFMT_FMT_MASK)
+		/* map format if necessary */
+		uint64_t mapped_format = map_format(hnd->internal_format & GRALLOC_ARM_INTFMT_FMT_MASK);
+
+		switch (mapped_format)
 		{
-			case HAL_PIXEL_FORMAT_YCbCr_420_888: /* Internally interpreted as NV12 */
+			case GRALLOC_ARM_HAL_FORMAT_INDEXED_NV12:
 				c_stride = y_stride;
 				/* Y plane, UV plane */
 				u_offset = y_size;
 				v_offset = y_size + 1;
 				step = 2;
 				break;
+
+            case GRALLOC_ARM_HAL_FORMAT_INDEXED_NV21:
+                c_stride = y_stride;
+                /* Y plane, UV plane */
+                v_offset = y_size;
+                u_offset = y_size + 1;
+                step = 2;
+                break;
 
 			case HAL_PIXEL_FORMAT_YV12:
 			case GRALLOC_ARM_HAL_FORMAT_INDEXED_YV12:

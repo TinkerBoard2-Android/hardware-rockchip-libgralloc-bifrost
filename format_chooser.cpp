@@ -102,7 +102,6 @@ static bool is_afbc_allowed(int buffer_size)
  * Define GRALLOC_ARM_FORMAT_SELECTION_DISABLE to disable the format selection completely
  * or GRALLOC_ARM_NO_EXTERNAL_AFBC to disable selection of AFBC formats for external buffers.
  */
-#define GRALLOC_ARM_FORMAT_SELECTION_DISABLE 
 uint64_t gralloc_select_format(int req_format, int usage, int buffer_size)
 {
 #if defined(GRALLOC_ARM_FORMAT_SELECTION_DISABLE)
@@ -118,16 +117,21 @@ uint64_t gralloc_select_format(int req_format, int usage, int buffer_size)
 	int largest_weight_ind=-1;
 	int16_t accum_weights[GRALLOC_ARM_FORMAT_INTERNAL_INDEXED_LAST] = {0};
 	int afbc_split_mode = 0;
-	bool afbc_allowed;
+	bool afbc_allowed = true;
 
 	ALOGV("gralloc_select_format: req_format=0x%x usage=0x%x\n",req_format,usage);
+
+       if ((usage & GRALLOC_ARM_USAGE_NO_AFBC) == GRALLOC_ARM_USAGE_NO_AFBC)
+       {
+               afbc_allowed = false;
+       }
 
 	/* The GRALLOC_USAGE_PRIVATE_3 set in the usage field indicates the req_format is
 	 * to be treated as encoded private format instead of trying to find closest match.
 	 * At the time being, the flag is used for testing AFBC and 10bit YUV that are not
 	 * yet supported by Android HAL */
 	/* Decode the passed in private format and get the gralloc indexed formats */
-	if (usage & GRALLOC_USAGE_PRIVATE_3)
+	else if (usage & GRALLOC_USAGE_PRIVATE_3)
 	{
 		uint64_t result = 0;
 	   	/* req_format is within the range for normal AFBC formats */
@@ -228,25 +232,32 @@ uint64_t gralloc_select_format(int req_format, int usage, int buffer_size)
 		return 0;
 	}
 
+       /* Implementation defined format set to YCbCr_420_888. */
+       if(req_format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED)
+       {
+               new_format = HAL_PIXEL_FORMAT_YCbCr_420_888;
+       }
+
 	if( (usage & (GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK)) != 0 ||
              usage == 0 )
 	{
 		return new_format;
 	}
 
-	/* This is currently a limitation with the display and will be removed eventually
-	 *  We can't allocate fbdev framebuffer buffers in AFBC format */
-	if( usage & GRALLOC_USAGE_HW_FB )
+    /* AFBC buffers are not allowed as an input to the video encoder */
+    if( (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) != 0 )
 	{
 		return new_format;
 	}
 
-	/* Implementation defined format set to YCbCr_420_888 interpreted as NV12. */
-	if((req_format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) || (req_format == HAL_PIXEL_FORMAT_YCbCr_420_888))
+#if DISABLE_FRAMEBUFFER_HAL != 1
+   /* This is currently a limitation with the display and will be removed eventually
+    *  We can't allocate fbdev framebuffer buffers in AFBC format */
+    if( usage & GRALLOC_USAGE_HW_FB )
 	{
-		return HAL_PIXEL_FORMAT_YCbCr_420_888;
+		return new_format;
 	}
-
+#endif
 	/* if this format can't be classified in one of the groups we
 	 * have pre-defined, ignore it.
 	 */
@@ -256,7 +267,10 @@ uint64_t gralloc_select_format(int req_format, int usage, int buffer_size)
 		return new_format;
 	}
 
-	afbc_allowed = is_afbc_allowed(buffer_size);
+    if (afbc_allowed)
+    {
+        afbc_allowed = is_afbc_allowed(buffer_size);
+    }
 	while( blklist[n].blk_init != 0 )
 	{
 		if( (blklist[n].hwblkconf.usage & usage) != 0 )

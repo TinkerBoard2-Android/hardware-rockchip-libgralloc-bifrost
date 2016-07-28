@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 #if RK_DRM_GRALLOC
+#define GRALLOC_UN_USED(arg)     (arg=arg)
 typedef enum
 {
 	MALI_YUV_NO_INFO,

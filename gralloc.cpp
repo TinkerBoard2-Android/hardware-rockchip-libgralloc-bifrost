@@ -155,6 +155,10 @@ static int gralloc_lock_ycbcr(gralloc_module_t const* module, buffer_handle_t ha
                               int l, int t, int w, int h,
                               android_ycbcr *ycbcr)
 {
+    GRALLOC_UN_USED(l);
+    GRALLOC_UN_USED(t);
+    GRALLOC_UN_USED(w);
+    GRALLOC_UN_USED(h);
 	if (gralloc_drm_handle(handle) == 0)
 	{
 		ALOGE("Locking invalid buffer %p, returning error", handle );

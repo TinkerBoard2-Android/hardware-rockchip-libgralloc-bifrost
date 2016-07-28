@@ -20,7 +20,8 @@
 #define GRALLOC_HELPER_H_
 
 #include <sys/mman.h>
-
+#include <system/graphics.h>
+#include "format_chooser.h"
 inline size_t round_up_to_page_size(size_t x)
 {
     return (x + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1);

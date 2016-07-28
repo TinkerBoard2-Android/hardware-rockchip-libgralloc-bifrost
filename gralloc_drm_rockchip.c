@@ -5,7 +5,7 @@
 #include <errno.h>
 #include <drm.h>
 #include <rockchip/rockchip_drmif.h>
-
+#include "gralloc_helper.h"
 #include "gralloc_drm.h"
 #include "gralloc_drm_priv.h"
 #if RK_DRM_GRALLOC
@@ -741,7 +741,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
                        if (alloc_for_arm_afbc_yuv)
                        {
                                ALOGE("Unsupported format YUV AFBC WIDEBLK.");
-                               return -EINVAL;
+                               return NULL;
                        }
 #endif
 			type = AFBC_WIDEBLK;
@@ -795,7 +795,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 				if (!get_yv12_stride_and_size(w, h, &pixel_stride, &byte_stride, &size, type, &internalHeight, yv12_align))
 				{
                                         AERR("fail to get stride and size.");
-					return -EINVAL;
+					return NULL;
 				}
 				break;
 			}

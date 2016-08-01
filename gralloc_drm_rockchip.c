@@ -9,6 +9,7 @@
 #include "gralloc_drm.h"
 #include "gralloc_drm_priv.h"
 #if RK_DRM_GRALLOC
+#include <cutils/properties.h>
 #include "format_chooser.h"
 #include "vpu_global.h"
 #if MALI_AFBC_GRALLOC == 1
@@ -32,6 +33,10 @@ struct rockchip_buffer {
 };
 
 #if RK_DRM_GRALLOC
+
+#define RK_GRALLOC_VERSION "1.0.3"
+#define ARM_RELEASE_VER "r12p0-04rel0"
+
 #if RK_DRM_GRALLOC_DEBUG
 #ifndef AWAR
 #define AWAR(fmt, args...) __android_log_print(ANDROID_LOG_WARN, "[Gralloc-Warning]", "%s:%d " fmt,__func__,__LINE__,##args)
@@ -1128,10 +1133,29 @@ static void drm_gem_rockchip_unmap(struct gralloc_drm_drv_t *drv,
 	UNUSED(drv, bo);
 }
 
+#if RK_DRM_GRALLOC
+static int drm_init_version()
+{
+    property_set("sys.ggralloc.version", RK_GRALLOC_VERSION);
+    ALOGD(RK_GRAPHICS_VER);
+    ALOGD("gralloc ver '%s' on arm_release_ver '%s', built at '%s', on '%s'.",
+        RK_GRALLOC_VERSION,
+        ARM_RELEASE_VER,
+        __TIME__,
+        __DATE__);
+
+    return 0;
+}
+#endif
+
 struct gralloc_drm_drv_t *gralloc_drm_drv_create_for_rockchip(int fd)
 {
 	struct rockchip_info *info;
 	int ret;
+
+#if RK_DRM_GRALLOC
+        drm_init_version();
+#endif
 
 	info = calloc(1, sizeof(*info));
 	if (!info) {

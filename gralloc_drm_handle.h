@@ -27,6 +27,7 @@
 #include <system/window.h>
 #include <cutils/native_handle.h>
 #include <system/graphics.h>
+#include <hardware/gralloc.h>
 #include "format_chooser.h"
 
 #ifdef __cplusplus
@@ -59,19 +60,16 @@ typedef enum
 #error "we must define MALI_PRODUCT_ID_TXXX for current Mali GPU."
 #endif
 
-#ifndef MALI_AFBC_GRALLOC
-#error "we must config MALI_AFBC_GRALLOC explicitly."
-#endif
-
+/* ??? mali-t860 ??? AFBC. */
 #if MALI_PRODUCT_ID_T86X == 1 && MALI_AFBC_GRALLOC != 1
 #error "we must enable AFBC for mali-t860."
 #endif
 
 #if MALI_PRODUCT_ID_T76X == 1 && MALI_AFBC_GRALLOC != 1
-#error "we must NOT enable AFBC for mali-t760."
+#error "we must enable AFBC for mali-t760."
 #endif
 
-#if MALI_PRODUCT_ID_T72X == 1 && MALI_AFBC_GRALLOC != 0
+#if MALI_PRODUCT_ID_T72X == 1 && MALI_AFBC_GRALLOC == 1
 #error "we must NOT enable AFBC for mali-t720."
 #endif
 #endif
@@ -87,10 +85,10 @@ struct gralloc_drm_handle_t {
 	int prime_fd;
 
 #if RK_DRM_GRALLOC
-        mali_dpy_type dpy_type;
 #if MALI_AFBC_GRALLOC == 1
 	int     share_attr_fd;
 #endif
+        mali_dpy_type dpy_type;
 
         uint64_t   internal_format;
         int        internalWidth;
@@ -166,7 +164,7 @@ static inline struct gralloc_drm_handle_t *gralloc_drm_handle(buffer_handle_t _h
 		ALOGE("invalid handle: version=%d, numInts=%d, numFds=%d, magic=%x",
 			handle->base.version, handle->base.numInts,
 			handle->base.numFds, handle->magic);
-	        ALOGE("invalid handle: right version=%d, numInts=%d, numFds=%d, magic=%x",
+	        ALOGE("invalid handle: right version=%zu, numInts=%zu, numFds=%d, magic=%x",
 	                sizeof(handle->base),GRALLOC_DRM_HANDLE_NUM_INTS,GRALLOC_DRM_HANDLE_NUM_FDS,
 	                GRALLOC_DRM_HANDLE_MAGIC);
 		handle = NULL;

@@ -108,6 +108,7 @@ uint64_t gralloc_select_format(int req_format, int usage, int buffer_size)
 #warning "arm_format_selection is disabled!"
 
 	(void) usage;
+	(void) buffer_size;
 	return (uint64_t) req_format;
 
 #else
@@ -342,7 +343,9 @@ void *gralloc_get_internal_info(int *blkconf_size, int *gpu_conf)
 		*gpu_conf = 0;
 #endif /* MALI_AFBC_GRALLOC */
 	}
-
+#else
+    (void) blkconf_size;
+    (void) gpu_conf;
 #endif /* GRALLOC_ARM_FORMAT_SELECTION_DISABLE */
 
 	return blkinit_address;

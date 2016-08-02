@@ -13,6 +13,7 @@
 #include "format_chooser.h"
 #include "vpu_global.h"
 #if MALI_AFBC_GRALLOC == 1
+#include <inttypes.h>
 #include "gralloc_buffer_priv.h"
 #endif //end of MALI_AFBC_GRALLOC
 #endif //end of RK_DRM_GRALLOC
@@ -742,6 +743,52 @@ static bool get_yuv422_10bit_afbc_stride_and_size(int width, int height, int* pi
 
 	return true;
 }
+
+static void init_afbc(uint8_t *buf, uint64_t format, int w, int h)
+{
+        uint32_t n_headers = (w * h) / 64;
+        uint32_t body_offset = n_headers * 16;
+        uint32_t headers[][4] = { {body_offset, 0x1, 0x0, 0x0}, /* Layouts 0, 3, 4 */
+                                  {(body_offset + (1 << 28)), 0x200040, 0x4000, 0x80} /* Layouts 1, 5 */
+                                };
+        uint32_t i, layout;
+
+        /* map format if necessary */
+        uint64_t mapped_format = map_format(format & GRALLOC_ARM_INTFMT_FMT_MASK);
+
+        switch (mapped_format)
+        {
+                case HAL_PIXEL_FORMAT_RGBA_8888:
+                case HAL_PIXEL_FORMAT_RGBX_8888:
+                case HAL_PIXEL_FORMAT_RGB_888:
+                case HAL_PIXEL_FORMAT_RGB_565:
+                case HAL_PIXEL_FORMAT_BGRA_8888:
+#if (PLATFORM_SDK_VERSION >= 19) && (PLATFORM_SDK_VERSION <= 22)
+                case HAL_PIXEL_FORMAT_sRGB_A_8888:
+                case HAL_PIXEL_FORMAT_sRGB_X_8888:
+#endif
+                        layout = 0;
+                        break;
+
+                case HAL_PIXEL_FORMAT_YV12:
+                case GRALLOC_ARM_HAL_FORMAT_INDEXED_NV12:
+                case GRALLOC_ARM_HAL_FORMAT_INDEXED_NV21:
+                        layout = 1;
+                        break;
+                default:
+                        layout = 0;
+        }
+
+        AINF("Writing AFBC header layout %d for format %"PRIu64"", layout, format);
+
+        for (i = 0; i < n_headers; i++)
+        {
+                memcpy(buf, headers[layout], sizeof(headers[layout]));
+                buf += sizeof(headers[layout]);
+        }
+
+}
+
 #endif
 
 static void drm_gem_rockchip_destroy(struct gralloc_drm_drv_t *drv)
@@ -779,6 +826,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
         int err;
         bool fmt_chg = false;
         int fmt_bak = format;
+        void *addr = NULL;
 
         AINF("enter, w : %d, h : %d, format : 0x%x, usage : 0x%x.", w, h, format, usage);
 
@@ -887,9 +935,9 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
                         if (!get_rk_nv12_stride_and_size(w, h, &pixel_stride, &byte_stride, &size))
                         {
                                 AERR("err.");
-                                return -EINVAL;
+                                return NULL;
                         }
-                        AINF("for nv12, w : %d, h : %d, pixel_stride : %d, byte_stride : %d, size : %d; internalHeight : %d.",
+                        AINF("for nv12, w : %d, h : %d, pixel_stride : %d, byte_stride : %d, size : %zu; internalHeight : %d.",
                                 w,
                                 h,
                                 pixel_stride,
@@ -905,7 +953,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
                                 return NULL;
                         }
 
-                        AINF("for nv12_10, w : %d, h : %d, pixel_stride : %d, byte_stride : %d, size : %d; internalHeight : %d.",
+                        AINF("for nv12_10, w : %d, h : %d, pixel_stride : %d, byte_stride : %d, size : %zu; internalHeight : %d.",
                                 w,
                                 h,
                                 pixel_stride,
@@ -1106,8 +1154,25 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		buf->base.fb_handle = gem_handle;
 	}
 
+#if GRALLOC_INIT_AFBC == 1
+        if (!(usage & GRALLOC_USAGE_PROTECTED))
+        {
+                addr = rockchip_bo_map(buf->bo);
+                if (!addr) {
+                        AERR("failed to map bo\n");
+                        goto err_unref;
+                }
+                if (format & (GRALLOC_ARM_INTFMT_AFBC | GRALLOC_ARM_INTFMT_AFBC_SPLITBLK | GRALLOC_ARM_INTFMT_AFBC_WIDEBLK))
+                {
+                        init_afbc((uint8_t*)addr, format, w, h);
+                }
+        }
+#endif /* GRALLOC_INIT_AFBC == 1 */
+
 #if RK_DRM_GRALLOC
 #if MALI_AFBC_GRALLOC == 1
+        handle->attr_base = MAP_FAILED;
+        handle->share_attr_fd = -1;
 	err = gralloc_buffer_attr_allocate( handle );
 	//ALOGD("err=%d,isfb=%x,[%d,%x]",err,usage & GRALLOC_USAGE_HW_FB,hnd->share_attr_fd,hnd->attr_base);
 	if( err < 0 )
@@ -1122,7 +1187,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		else
 		{
 			drm_gem_rockchip_free( drv, &buf->base );
-			return NULL;
+			goto err_unref;
 		}
 	}
 #endif
@@ -1159,8 +1224,8 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
         handle->name = 0;
 	buf->base.handle = handle;
 
-        AINF("leave, w : %d, h : %d, format : 0x%x,internal_format : 0x%x, usage : 0x%x.", handle->width, handle->height, handle->format,internal_format, handle->usage);
-
+        AINF("leave, w : %d, h : %d, format : 0x%x,internal_format : 0x%x, usage : 0x%x.", handle->width, handle->height, handle->format,(int)internal_format, handle->usage);
+        AINF("leave: prime_fd=%d,share_attr_fd=%d",handle->prime_fd,handle->share_attr_fd);
 	return &buf->base;
 
 err_unref:
@@ -1222,15 +1287,21 @@ static void drm_gem_rockchip_unmap(struct gralloc_drm_drv_t *drv,
 #if RK_DRM_GRALLOC
 static int drm_init_version()
 {
-    property_set("sys.ggralloc.version", RK_GRALLOC_VERSION);
-    ALOGD(RK_GRAPHICS_VER);
-    ALOGD("gralloc ver '%s' on arm_release_ver '%s', built at '%s', on '%s'.",
-        RK_GRALLOC_VERSION,
-        ARM_RELEASE_VER,
-        __TIME__,
-        __DATE__);
+        char value[PROPERTY_VALUE_MAX];
 
-    return 0;
+        property_get("sys.ggralloc.version", value, "NULL");
+        if(!strcmp(value,"NULL"))
+        {
+                property_set("sys.ggralloc.version", RK_GRALLOC_VERSION);
+                ALOGD(RK_GRAPHICS_VER);
+                ALOGD("gralloc ver '%s' on arm_release_ver '%s', built at '%s', on '%s'.",
+                        RK_GRALLOC_VERSION,
+                        ARM_RELEASE_VER,
+                        __TIME__,
+                        __DATE__);
+        }
+
+        return 0;
 }
 #endif
 

@@ -186,7 +186,7 @@ static struct gralloc_drm_bo_t *validate_handle(buffer_handle_t _handle,
 			bo->drm = drm;
 			bo->imported = 1;
 			bo->handle = handle;
-			bo->refcount = 1;
+			bo->refcount = 0;
 		}
 
 		handle->data_owner = gralloc_drm_get_pid();
@@ -203,7 +203,7 @@ int gralloc_drm_handle_register(buffer_handle_t handle, struct gralloc_drm_t *dr
 {
     struct gralloc_drm_bo_t *bo;
 
-	pthread_mutex_lock(&bo_mutex);
+    pthread_mutex_lock(&bo_mutex);
     bo = validate_handle(handle, drm);
     if (!bo) {
 	pthread_mutex_unlock(&bo_mutex);
@@ -211,7 +211,7 @@ int gralloc_drm_handle_register(buffer_handle_t handle, struct gralloc_drm_t *dr
     }
 
     bo->refcount++;
-	pthread_mutex_unlock(&bo_mutex);
+    pthread_mutex_unlock(&bo_mutex);
 
 	return 0;
 }
@@ -227,10 +227,7 @@ int gralloc_drm_handle_unregister(buffer_handle_t handle)
 	if (!bo)
 		return -EINVAL;
 
-    gralloc_drm_bo_decref(bo);
-
-	if (bo->imported)
-		gralloc_drm_bo_decref(bo);
+        gralloc_drm_bo_decref(bo);
 
 	return 0;
 }

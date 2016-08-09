@@ -96,6 +96,7 @@ struct gralloc_drm_handle_t {
         int        byte_stride;
         int        size;
         int        ref;
+        int        pixel_stride;
         
 
         union {

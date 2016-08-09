@@ -1211,6 +1211,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 	}
 
         handle->stride = byte_stride;//pixel_stride;
+        handle->pixel_stride = pixel_stride;
         handle->byte_stride = byte_stride;
         handle->format = fmt_chg ? fmt_bak : format;
         handle->size = size;

@@ -498,7 +498,7 @@ int gralloc_drm_handle_get_attributes(buffer_handle_t _handle, void *attrs)
 		attributes->clear();
 		attributes->push_back(handle->width);
 		attributes->push_back(handle->height);
-		attributes->push_back(handle->stride);
+		attributes->push_back(handle->pixel_stride);
 		attributes->push_back(handle->format);
 		attributes->push_back(handle->size);
 	}

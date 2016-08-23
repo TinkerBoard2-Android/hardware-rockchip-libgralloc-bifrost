@@ -280,7 +280,10 @@ struct gralloc_drm_bo_t *gralloc_drm_bo_create(struct gralloc_drm_t *drm,
 
 	handle = create_bo_handle(width, height, format, usage);
 	if (!handle)
+	{
+	    ALOGE("zxl create_bo_handle failed");
 		return NULL;
+    }
 
 	bo = drm->drv->alloc(drm->drv, handle);
 	if (!bo) {
@@ -501,6 +504,26 @@ int gralloc_drm_handle_get_attributes(buffer_handle_t _handle, void *attrs)
 		attributes->push_back(handle->pixel_stride);
 		attributes->push_back(handle->format);
 		attributes->push_back(handle->size);
+	}
+    gralloc_drm_unlock_handle(_handle);
+	return ret;
+}
+
+
+int gralloc_drm_handle_get_internal_format(buffer_handle_t _handle, uint64_t *internal_format)
+{
+	int ret = 0;
+	struct gralloc_drm_handle_t *handle = gralloc_drm_handle(_handle);
+
+	if (!handle)
+		return -EINVAL;
+
+	if (unlikely(handle->data_owner != gralloc_drm_pid)) {
+		ret = -EPERM;
+		ALOGE("handle get attributes before register buffer.");
+	} else {
+		ret = 0;
+		*internal_format = handle->internal_format;
 	}
     gralloc_drm_unlock_handle(_handle);
 	return ret;

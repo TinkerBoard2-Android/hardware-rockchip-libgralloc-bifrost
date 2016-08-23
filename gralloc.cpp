@@ -96,6 +96,17 @@ static int drm_mod_perform(const struct gralloc_module_t *mod, int op, ...)
 				err = -EINVAL;
 		}
 		break;
+     case GRALLOC_MODULE_PERFORM_GET_INTERNAL_FORMAT:
+        {
+            buffer_handle_t hnd = va_arg(args, buffer_handle_t);
+            uint64_t *internal_format = va_arg(args, uint64_t *);
+
+            if(internal_format > NULL)
+                err = gralloc_drm_handle_get_internal_format(hnd, internal_format);
+            else
+                err = -EINVAL;
+        }
+        break;
     case GRALLOC_MODULE_PERFORM_GET_USAGE:
         {
             buffer_handle_t hnd = va_arg(args, buffer_handle_t);

@@ -856,6 +856,20 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
         alloc_for_extended_yuv = (internal_format & GRALLOC_ARM_INTFMT_EXTENDED_YUV) == GRALLOC_ARM_INTFMT_EXTENDED_YUV;
         alloc_for_arm_afbc_yuv = (internal_format & GRALLOC_ARM_INTFMT_ARM_AFBC_YUV) == GRALLOC_ARM_INTFMT_ARM_AFBC_YUV;
 
+#if USE_AFBC_LAYER
+#define MAGIC_USAGE_TO_USE_AFBC_LAYER     (0x88)
+    if ( MAGIC_USAGE_TO_USE_AFBC_LAYER == (usage & MAGIC_USAGE_TO_USE_AFBC_LAYER) ) {
+        internal_format = GRALLOC_ARM_INTFMT_AFBC | GRALLOC_ARM_HAL_FORMAT_INDEXED_RGBA_8888;
+        AWAR("use_afbc_layer: force to set 'internal_format' to 0x%llx for usage '0x%x'.", internal_format, usage);
+    }
+
+    if (usage & GRALLOC_USAGE_HW_FB) {
+        internal_format = GRALLOC_ARM_INTFMT_AFBC | GRALLOC_ARM_HAL_FORMAT_INDEXED_RGBA_8888;
+        ALOGD("use_afbc_layer: force to set 'internal_format' to 0x%llx for buffer_for_fb_target_layer.",
+        internal_format);
+    }
+#endif
+
 	if (internal_format & (GRALLOC_ARM_INTFMT_AFBC | GRALLOC_ARM_INTFMT_AFBC_SPLITBLK | GRALLOC_ARM_INTFMT_AFBC_WIDEBLK))
 	{
 		if (usage & GRALLOC_USAGE_PRIVATE_2)
@@ -1225,7 +1239,8 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
         handle->name = 0;
 	buf->base.handle = handle;
 
-        AINF("leave, w : %d, h : %d, format : 0x%x,internal_format : 0x%x, usage : 0x%x.", handle->width, handle->height, handle->format,(int)internal_format, handle->usage);
+        AINF("leave, w : %d, h : %d, format : 0x%x,internal_format : 0x%llx, usage : 0x%x. size=%d",
+                handle->width, handle->height, handle->format,internal_format, handle->usage, handle->size);
         AINF("leave: prime_fd=%d,share_attr_fd=%d",handle->prime_fd,handle->share_attr_fd);
 	return &buf->base;
 

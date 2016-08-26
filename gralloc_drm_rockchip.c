@@ -857,16 +857,18 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
         alloc_for_arm_afbc_yuv = (internal_format & GRALLOC_ARM_INTFMT_ARM_AFBC_YUV) == GRALLOC_ARM_INTFMT_ARM_AFBC_YUV;
 
 #if USE_AFBC_LAYER
-#define MAGIC_USAGE_TO_USE_AFBC_LAYER     (0x88)
-    if ( MAGIC_USAGE_TO_USE_AFBC_LAYER == (usage & MAGIC_USAGE_TO_USE_AFBC_LAYER) ) {
-        internal_format = GRALLOC_ARM_INTFMT_AFBC | GRALLOC_ARM_HAL_FORMAT_INDEXED_RGBA_8888;
-        AWAR("use_afbc_layer: force to set 'internal_format' to 0x%llx for usage '0x%x'.", internal_format, usage);
-    }
-
-    if (usage & GRALLOC_USAGE_HW_FB) {
-        internal_format = GRALLOC_ARM_INTFMT_AFBC | GRALLOC_ARM_HAL_FORMAT_INDEXED_RGBA_8888;
-        ALOGD("use_afbc_layer: force to set 'internal_format' to 0x%llx for buffer_for_fb_target_layer.",
-        internal_format);
+#define MAGIC_USAGE_FOR_AFBC_LAYER     (0x88)
+    if (!(usage & GRALLOC_USAGE_HW_FB)) {
+            if ( MAGIC_USAGE_FOR_AFBC_LAYER == (usage & MAGIC_USAGE_FOR_AFBC_LAYER) ) {
+                internal_format = GRALLOC_ARM_INTFMT_AFBC | GRALLOC_ARM_HAL_FORMAT_INDEXED_RGBA_8888;
+                AWAR("use_afbc_layer: force to set 'internal_format' to 0x%llx for usage '0x%x'.", internal_format, usage);
+            }
+    } else {
+        if(MAGIC_USAGE_FOR_AFBC_LAYER != (usage & MAGIC_USAGE_FOR_AFBC_LAYER)) {
+                internal_format = GRALLOC_ARM_INTFMT_AFBC | GRALLOC_ARM_HAL_FORMAT_INDEXED_RGBA_8888;
+                AWAR("use_afbc_layer: force to set 'internal_format' to 0x%llx for buffer_for_fb_target_layer.",
+                internal_format);
+        }
     }
 #endif
 

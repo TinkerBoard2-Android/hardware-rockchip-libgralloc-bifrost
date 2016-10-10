@@ -11,7 +11,6 @@
 #if RK_DRM_GRALLOC
 #include <cutils/properties.h>
 #include "format_chooser.h"
-#include "vpu_global.h"
 #if MALI_AFBC_GRALLOC == 1
 #include <inttypes.h>
 #include "gralloc_buffer_priv.h"

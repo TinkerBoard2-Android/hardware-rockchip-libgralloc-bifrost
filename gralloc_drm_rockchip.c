@@ -86,7 +86,7 @@ struct rockchip_buffer {
 // Default YUV stride aligment in Android
 #define YUV_ANDROID_PLANE_ALIGN 16
 
-typedef int bool;
+//typedef int bool;
 #define true 1
 #define false 0
 
@@ -1320,9 +1320,7 @@ static int drm_init_version()
                 ALOGD(RK_GRAPHICS_VER);
                 ALOGD("gralloc ver '%s' on arm_release_ver '%s', built at '%s', on '%s'.",
                         RK_GRALLOC_VERSION,
-                        ARM_RELEASE_VER,
-                        __TIME__,
-                        __DATE__);
+                        ARM_RELEASE_VER);
         }
 
         return 0;

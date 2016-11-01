@@ -204,6 +204,7 @@ static int gralloc_lock_ycbcr(gralloc_module_t const* module, buffer_handle_t ha
 		switch (mapped_format)
 		{
 			case GRALLOC_ARM_HAL_FORMAT_INDEXED_NV12:
+			case HAL_PIXEL_FORMAT_YCbCr_420_888:
 				c_stride = y_stride;
 				/* Y plane, UV plane */
 				u_offset = y_size;

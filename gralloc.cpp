@@ -330,6 +330,7 @@ static int drm_mod_open_gpu0(struct drm_module_t *dmod, hw_device_t **dev)
 
 	alloc->alloc = drm_mod_alloc_gpu0;
 	alloc->free = drm_mod_free_gpu0;
+	alloc->dump = NULL;
 
 	*dev = &alloc->common;
 

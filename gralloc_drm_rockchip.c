@@ -16,6 +16,7 @@
 #include "gralloc_buffer_priv.h"
 #endif //end of MALI_AFBC_GRALLOC
 #endif //end of RK_DRM_GRALLOC
+#include <stdbool.h>
 
 #define UNUSED(...) (void)(__VA_ARGS__)
 
@@ -84,10 +85,6 @@ struct rockchip_buffer {
 
 // Default YUV stride aligment in Android
 #define YUV_ANDROID_PLANE_ALIGN 16
-
-//typedef int bool;
-#define true 1
-#define false 0
 
 static void drm_gem_rockchip_free(struct gralloc_drm_drv_t *drv,
 		struct gralloc_drm_bo_t *bo);
@@ -1465,7 +1462,7 @@ static int drm_init_version()
         {
                 property_set("sys.ggralloc.version", RK_GRALLOC_VERSION);
                 ALOGD(RK_GRAPHICS_VER);
-                ALOGD("gralloc ver '%s' on arm_release_ver '%s', built at '%s', on '%s'.",
+                ALOGD("gralloc ver '%s' on arm_release_ver '%s'.",
                         RK_GRALLOC_VERSION,
                         ARM_RELEASE_VER);
         }

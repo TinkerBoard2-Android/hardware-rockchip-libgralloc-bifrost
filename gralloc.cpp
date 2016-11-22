@@ -296,7 +296,12 @@ static int drm_mod_alloc_gpu0(alloc_device_t *dev,
 
 	bpp = gralloc_drm_get_bpp(format);
 	if (!bpp)
+	{
+#if RK_DRM_GRALLOC
+		ALOGE("Cann't get valid bpp for format(0x%x)", format);
+#endif
 		return -EINVAL;
+	}
 
 	bo = gralloc_drm_bo_create(dmod->drm, w, h, format, usage);
 	if (!bo)

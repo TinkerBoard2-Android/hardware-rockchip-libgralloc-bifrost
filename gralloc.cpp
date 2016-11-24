@@ -34,6 +34,11 @@
 #include "gralloc_drm.h"
 #include "gralloc_drm_priv.h"
 #include "gralloc_drm_handle.h"
+#include <inttypes.h>
+
+#if RK_DRM_GRALLOC
+#include <cutils/atomic.h>
+#endif
 
 #define UNUSED(...) (void)(__VA_ARGS__)
 
@@ -143,7 +148,8 @@ static int drm_mod_register_buffer(const gralloc_module_t *mod,
 static int drm_mod_unregister_buffer(const gralloc_module_t *mod,
 		buffer_handle_t handle)
 {
-    UNUSED(mod);
+       UNUSED(mod);
+
 	return gralloc_drm_handle_unregister(handle);
 }
 
@@ -236,7 +242,7 @@ static int gralloc_lock_ycbcr(gralloc_module_t const* module, buffer_handle_t ha
 			}
 
 			default:
-				ALOGE("Can't lock buffer %p: wrong format %llx", hnd, hnd->internal_format);
+				ALOGE("Can't lock buffer %p: wrong format %" PRIu64 "", hnd, hnd->internal_format);
 				return -EINVAL;
 		}
 
@@ -272,7 +278,18 @@ static int drm_mod_close_gpu0(struct hw_device_t *dev)
 	struct drm_module_t *dmod = (struct drm_module_t *)dev->module;
 	struct alloc_device_t *alloc = (struct alloc_device_t *) dev;
 
-	gralloc_drm_destroy(dmod->drm);
+#if RK_DRM_GRALLOC
+	android_atomic_dec(&dmod->refcount);
+
+       if(!dmod->refcount && dmod->drm)
+
+       {
+              gralloc_drm_destroy(dmod->drm);
+              dmod->drm = NULL;
+       }
+#else
+       gralloc_drm_destroy(dmod->drm);
+#endif
 	delete alloc;
 
 	return 0;
@@ -319,6 +336,10 @@ static int drm_mod_open_gpu0(struct drm_module_t *dmod, hw_device_t **dev)
 {
 	struct alloc_device_t *alloc;
 	int err;
+
+#if RK_DRM_GRALLOC
+	android_atomic_inc(&dmod->refcount);
+#endif
 
 	err = drm_init(dmod);
 	if (err)
@@ -379,6 +400,10 @@ drm_module_t::drm_module_t()
 
     mutex = PTHREAD_MUTEX_INITIALIZER;
     drm = NULL;
+
+#if RK_DRM_GRALLOC
+    refcount = 0;
+#endif
 
     initialize_blk_conf();
 }

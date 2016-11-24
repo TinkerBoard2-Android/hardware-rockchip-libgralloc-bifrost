@@ -51,6 +51,10 @@ struct drm_module_t {
 	/* default constructor */
 	drm_module_t();
 #endif
+
+#if RK_DRM_GRALLOC
+	volatile int32_t refcount;
+#endif
 };
 
 struct gralloc_drm_drv_t {

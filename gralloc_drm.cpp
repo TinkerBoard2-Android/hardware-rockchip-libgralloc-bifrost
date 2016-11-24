@@ -139,7 +139,7 @@ struct gralloc_drm_t *gralloc_drm_create(void)
  */
 void gralloc_drm_destroy(struct gralloc_drm_t *drm)
 {
-	if (drm->drv)
+	if (drm && drm->drv)
 		drm->drv->destroy(drm->drv);
 	close(drm->fd);
 	delete drm;

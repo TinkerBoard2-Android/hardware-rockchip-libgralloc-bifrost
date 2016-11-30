@@ -35,8 +35,8 @@ struct rockchip_buffer {
 
 #if RK_DRM_GRALLOC
 
-#define RK_GRALLOC_VERSION "1.0.4"
-#define ARM_RELEASE_VER "r12p0-04rel0"
+#define RK_GRALLOC_VERSION "1.0.5"
+#define ARM_RELEASE_VER "r13p0-00rel0"
 
 #if RK_DRM_GRALLOC_DEBUG
 #ifndef AWAR

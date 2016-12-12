@@ -1421,6 +1421,8 @@ static void drm_gem_rockchip_free(struct gralloc_drm_drv_t *drv,
 
 	if (gr_handle->prime_fd)
 		close(gr_handle->prime_fd);
+
+	gr_handle->prime_fd = -1;
 #endif
         gralloc_drm_unlock_handle((buffer_handle_t)bo->handle);
 

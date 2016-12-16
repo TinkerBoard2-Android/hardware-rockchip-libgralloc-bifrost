@@ -311,7 +311,20 @@ static int drm_mod_alloc_gpu0(alloc_device_t *dev,
 	struct gralloc_drm_bo_t *bo;
 	int size, bpp, err;
 
-	bpp = gralloc_drm_get_bpp(format);
+#if RK_DRM_GRALLOC
+    if(format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED)
+    {
+        if(usage  & GRALLOC_USAGE_HW_VIDEO_ENCODER)
+            bpp = 1;    //HAL_PIXEL_FORMAT_YCrCb_NV12
+        else
+            bpp = 4;    //HAL_PIXEL_FORMAT_RGBX_8888
+    }
+    else
+#endif
+    {
+	    bpp = gralloc_drm_get_bpp(format);
+    }
+
 	if (!bpp)
 	{
 #if RK_DRM_GRALLOC

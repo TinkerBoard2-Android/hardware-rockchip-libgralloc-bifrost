@@ -334,16 +334,14 @@ static bool get_yuv422_8bit_stride_and_size(int width, int height, int* pixel_st
 }
 
 
-static bool get_rk_nv12_stride_and_size(int width, int height, int* pixel_stride, int* byte_stride, size_t* size, int stride_alignment)
+static bool get_rk_nv12_stride_and_size(int width, int height, int* pixel_stride, int* byte_stride, size_t* size)
 {
 
     /**
      * .KP : from CSY : video_decoder 要求的 byte_stride of buffer in NV12, 已经通过 width 传入.
      * 对 NV12, byte_stride 就是 pixel_stride, 也就是 luma_stride.
      */
-       int luma_stride;
-
-       luma_stride = GRALLOC_ALIGN(width, stride_alignment);
+       int luma_stride = width;
 
        if (width % 2 != 0 || height % 2 != 0)
        {
@@ -1080,24 +1078,20 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
                          * and must fill the variables pixel_stride, byte_stride and size.
                          */
                         case HAL_PIXEL_FORMAT_YCrCb_NV12:
-			{
-				//NV12 video's offset need 64 bytes alignment.
-				//Fix "E hwc-gl-worker: Failed to make image EGL_BAD_ALLOC 0x76f33e8780"
-				int yv12_align = 32;
-	                        if (!get_rk_nv12_stride_and_size(w, h, &pixel_stride, &byte_stride, &size, yv12_align))
-	                        {
-	                                AERR("err.");
-	                                return NULL;
-	                        }
-	                        AINF("for nv12, w : %d, h : %d, pixel_stride : %d, byte_stride : %d, size : %zu; internalHeight : %d.",
-	                                w,
-	                                h,
-	                                pixel_stride,
-	                                byte_stride,
-	                                size,
-	                                internalHeight);
-	                        break;
-			}
+                        if (!get_rk_nv12_stride_and_size(w, h, &pixel_stride, &byte_stride, &size))
+                        {
+                                AERR("err.");
+                                return NULL;
+                        }
+                        AINF("for nv12, w : %d, h : %d, pixel_stride : %d, byte_stride : %d, size : %zu; internalHeight : %d.",
+                                w,
+                                h,
+                                pixel_stride,
+                                byte_stride,
+                                size,
+                                internalHeight);
+                        break;
+
                         case HAL_PIXEL_FORMAT_YCrCb_NV12_10:
                         if (!get_rk_nv12_10bit_stride_and_size(w, h, &pixel_stride, &byte_stride, &size))
                         {

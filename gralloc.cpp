@@ -36,6 +36,8 @@
 #include "gralloc_drm_handle.h"
 #include <inttypes.h>
 
+#include <utils/CallStack.h>
+
 #if RK_DRM_GRALLOC
 #include <cutils/atomic.h>
 #endif
@@ -159,7 +161,7 @@ static int drm_mod_lock(const gralloc_module_t *mod, buffer_handle_t handle,
 	struct gralloc_drm_bo_t *bo;
 	int err;
 
-    UNUSED(mod);
+	UNUSED(mod);
 
 	bo = gralloc_drm_bo_from_handle(handle);
 	if (!bo)
@@ -171,31 +173,32 @@ static int drm_mod_lock(const gralloc_module_t *mod, buffer_handle_t handle,
 	return err;
 }
 
-#define GRALLOC_ALIGN( value, base ) (((value) + ((base) - 1)) & ~((base) - 1))
-static int gralloc_lock_ycbcr(gralloc_module_t const* module, buffer_handle_t handle, int usage,
-                              int l, int t, int w, int h,
-                              android_ycbcr *ycbcr)
+#define GRALLOC_ALIGN(value, base) (((value) + ((base) - 1)) & ~((base) - 1))
+static int drm_mod_lock_ycbcr(gralloc_module_t const* module,
+				buffer_handle_t handle, int usage,
+				int l, int t, int w, int h, android_ycbcr *ycbcr)
 {
-    GRALLOC_UN_USED(l);
-    GRALLOC_UN_USED(t);
-    GRALLOC_UN_USED(w);
-    GRALLOC_UN_USED(h);
-	if (gralloc_drm_handle(handle) == 0)
-	{
-		ALOGE("Locking invalid buffer %p, returning error", handle );
+	struct gralloc_drm_bo_t *bo;
+	int ret = 0;
+
+	GRALLOC_UN_USED(module);
+	GRALLOC_UN_USED(l);
+	GRALLOC_UN_USED(t);
+	GRALLOC_UN_USED(w);
+	GRALLOC_UN_USED(h);
+
+	bo = gralloc_drm_bo_from_handle(handle);
+	if (!bo)
 		return -EINVAL;
-	}
 
 	struct gralloc_drm_handle_t* hnd = (struct gralloc_drm_handle_t*)handle;
 
-
-	if (usage & (GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK))
-	{
-		unsigned int *cpu_addr;
-		drm_mod_lock(module,handle,hnd->usage,0,0,hnd->width,hnd->height,(void **)&cpu_addr);
-
+	if (usage & (GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK)) {
+		char *cpu_addr;
 		int y_stride = hnd->byte_stride;
-		/* Ensure height is aligned for subsampled chroma before calculating buffer parameters */
+		/* Ensure height is aligned for subsampled chroma
+		 *before calculating buffer parameters
+		 */
 		int adjusted_height = GRALLOC_ALIGN(hnd->height, 2);
 		int y_size =  y_stride * adjusted_height;
 
@@ -204,8 +207,11 @@ static int gralloc_lock_ycbcr(gralloc_module_t const* module, buffer_handle_t ha
 		int c_stride = 0;
 		int step = 0;
 
-        /* Map format if necessary (also removes internal extension bits) */
-        uint64_t mapped_format = map_format(hnd->internal_format);
+		/* Map format if necessary (also removes internal extension bits) */
+		uint64_t mapped_format = map_format(hnd->internal_format);
+
+		int ret = gralloc_drm_bo_lock(bo, hnd->usage,
+				0, 0, hnd->width, hnd->height,(void **)&cpu_addr);
 
 		switch (mapped_format)
 		{
@@ -218,20 +224,22 @@ static int gralloc_lock_ycbcr(gralloc_module_t const* module, buffer_handle_t ha
 				step = 2;
 				break;
 
-            case GRALLOC_ARM_HAL_FORMAT_INDEXED_NV21:
-                c_stride = y_stride;
-                /* Y plane, UV plane */
-                v_offset = y_size;
-                u_offset = y_size + 1;
-                step = 2;
-                break;
+			case GRALLOC_ARM_HAL_FORMAT_INDEXED_NV21:
+				c_stride = y_stride;
+				/* Y plane, UV plane */
+				v_offset = y_size;
+				u_offset = y_size + 1;
+				step = 2;
+				break;
 
 			case HAL_PIXEL_FORMAT_YV12:
 			case GRALLOC_ARM_HAL_FORMAT_INDEXED_YV12:
 			{
 				int c_size;
 
-				/* Stride alignment set to 16 as the SW access flags were set */
+				/* Stride alignment set to 16 as the SW access flags
+				 *were set
+				 */
 				c_stride = GRALLOC_ALIGN(hnd->byte_stride / 2, 16);
 				c_size = c_stride * (adjusted_height / 2);
 				/* Y plane, V plane, U plane */
@@ -242,18 +250,24 @@ static int gralloc_lock_ycbcr(gralloc_module_t const* module, buffer_handle_t ha
 			}
 
 			default:
-				ALOGE("Can't lock buffer %p: wrong format %" PRIu64 "", hnd, hnd->internal_format);
-				return -EINVAL;
+				ALOGE("Can't lock buffer %p: wrong format %" PRIu64 "",
+								hnd, hnd->internal_format);
+				ret = -EINVAL;
+				break;
 		}
 
-		ycbcr->y = cpu_addr;
-		ycbcr->cb = cpu_addr + u_offset;
-		ycbcr->cr = cpu_addr + v_offset;
-		ycbcr->ystride = y_stride;
-		ycbcr->cstride = c_stride;
-		ycbcr->chroma_step = step;
+		if (!ret) {
+			ycbcr->y = cpu_addr;
+			ycbcr->cb = cpu_addr + u_offset;
+			ycbcr->cr = cpu_addr + v_offset;
+			ycbcr->ystride = y_stride;
+			ycbcr->cstride = c_stride;
+			ycbcr->chroma_step = step;
+		}
 	}
-	return 0;
+
+	gralloc_drm_bo_decref(bo);
+	return ret;
 }
 
 
@@ -407,7 +421,7 @@ drm_module_t::drm_module_t()
     base.registerBuffer = drm_mod_register_buffer;
     base.unregisterBuffer = drm_mod_unregister_buffer;
     base.lock = drm_mod_lock;
-    base.lock_ycbcr = gralloc_lock_ycbcr;
+    base.lock_ycbcr = drm_mod_lock_ycbcr;
     base.unlock = drm_mod_unlock;
     base.perform = drm_mod_perform;
 

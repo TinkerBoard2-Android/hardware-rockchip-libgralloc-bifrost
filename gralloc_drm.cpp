@@ -403,12 +403,6 @@ int gralloc_drm_bo_lock(struct gralloc_drm_bo_t *bo,
 		int usage, int x, int y, int w, int h,
 		void **addr)
 {
-    if (bo->handle->format == HAL_PIXEL_FORMAT_YCbCr_420_888)
-    {
-		ALOGE("Buffers with format YCbCr_420_888 must be locked using (*lock_ycbcr)" );
-		return -EINVAL;
-	}
-
 	if ((bo->handle->usage & usage) != usage) {
 		/* make FB special for testing software renderer with */
 

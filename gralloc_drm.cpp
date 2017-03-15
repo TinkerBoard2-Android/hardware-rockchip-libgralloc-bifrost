@@ -498,6 +498,7 @@ int gralloc_drm_handle_get_attributes(buffer_handle_t _handle, void *attrs)
 		attributes->push_back(handle->pixel_stride);
 		attributes->push_back(handle->format);
 		attributes->push_back(handle->size);
+		attributes->push_back(handle->stride);
 	}
     gralloc_drm_unlock_handle(_handle);
 	return ret;
@@ -522,6 +523,127 @@ int gralloc_drm_handle_get_internal_format(buffer_handle_t _handle, uint64_t *in
     gralloc_drm_unlock_handle(_handle);
 	return ret;
 }
+
+int gralloc_drm_handle_get_width(buffer_handle_t _handle, int *width)
+{
+	int ret = 0;
+	struct gralloc_drm_handle_t *handle = gralloc_drm_handle(_handle);
+
+	if (!handle)
+		return -EINVAL;
+
+	if (unlikely(handle->data_owner != gralloc_drm_pid)) {
+		ret = -EPERM;
+		ALOGE("handle get usage before register buffer.");
+	} else {
+		ret = 0;
+		*width = handle->width;
+	}
+    gralloc_drm_unlock_handle(_handle);
+
+	return ret;
+}
+
+int gralloc_drm_handle_get_height(buffer_handle_t _handle, int *height)
+{
+	int ret = 0;
+	struct gralloc_drm_handle_t *handle = gralloc_drm_handle(_handle);
+
+	if (!handle)
+		return -EINVAL;
+
+	if (unlikely(handle->data_owner != gralloc_drm_pid)) {
+		ret = -EPERM;
+		ALOGE("handle get usage before register buffer.");
+	} else {
+		ret = 0;
+		*height = handle->height;
+	}
+    gralloc_drm_unlock_handle(_handle);
+
+	return ret;
+}
+
+int gralloc_drm_handle_get_stride(buffer_handle_t _handle, int *stride)
+{
+	int ret = 0;
+	struct gralloc_drm_handle_t *handle = gralloc_drm_handle(_handle);
+
+	if (!handle)
+		return -EINVAL;
+
+	if (unlikely(handle->data_owner != gralloc_drm_pid)) {
+		ret = -EPERM;
+		ALOGE("handle get usage before register buffer.");
+	} else {
+		ret = 0;
+		*stride = handle->pixel_stride;
+	}
+    gralloc_drm_unlock_handle(_handle);
+
+	return ret;
+}
+
+int gralloc_drm_handle_get_byte_stride(buffer_handle_t _handle, int *byte_stride)
+{
+	int ret = 0;
+	struct gralloc_drm_handle_t *handle = gralloc_drm_handle(_handle);
+
+	if (!handle)
+		return -EINVAL;
+
+	if (unlikely(handle->data_owner != gralloc_drm_pid)) {
+		ret = -EPERM;
+		ALOGE("handle get usage before register buffer.");
+	} else {
+		ret = 0;
+		*byte_stride = handle->stride;
+	}
+    gralloc_drm_unlock_handle(_handle);
+
+	return ret;
+}
+
+int gralloc_drm_handle_get_format(buffer_handle_t _handle, int *format)
+{
+	int ret = 0;
+	struct gralloc_drm_handle_t *handle = gralloc_drm_handle(_handle);
+
+	if (!handle)
+		return -EINVAL;
+
+	if (unlikely(handle->data_owner != gralloc_drm_pid)) {
+		ret = -EPERM;
+		ALOGE("handle get usage before register buffer.");
+	} else {
+		ret = 0;
+		*format = handle->format;
+	}
+    gralloc_drm_unlock_handle(_handle);
+
+	return ret;
+}
+
+int gralloc_drm_handle_get_size(buffer_handle_t _handle, int *size)
+{
+	int ret = 0;
+	struct gralloc_drm_handle_t *handle = gralloc_drm_handle(_handle);
+
+	if (!handle)
+		return -EINVAL;
+
+	if (unlikely(handle->data_owner != gralloc_drm_pid)) {
+		ret = -EPERM;
+		ALOGE("handle get usage before register buffer.");
+	} else {
+		ret = 0;
+		*size = handle->size;
+	}
+    gralloc_drm_unlock_handle(_handle);
+
+	return ret;
+}
+
 
 int gralloc_drm_handle_get_usage(buffer_handle_t _handle, int *usage)
 {

@@ -114,6 +114,72 @@ static int drm_mod_perform(const struct gralloc_module_t *mod, int op, ...)
                 err = -EINVAL;
         }
         break;
+    case GRALLOC_MODULE_PERFORM_GET_HADNLE_WIDTH:
+        {
+            buffer_handle_t hnd = va_arg(args, buffer_handle_t);
+            int *width = va_arg(args, int *);
+
+            if(width > NULL)
+                err = gralloc_drm_handle_get_width(hnd, width);
+            else
+                err = -EINVAL;
+        }
+        break;
+    case GRALLOC_MODULE_PERFORM_GET_HADNLE_HEIGHT:
+        {
+            buffer_handle_t hnd = va_arg(args, buffer_handle_t);
+            int *height = va_arg(args, int *);
+
+            if(height > NULL)
+                err = gralloc_drm_handle_get_height(hnd, height);
+            else
+                err = -EINVAL;
+        }
+        break;
+    case GRALLOC_MODULE_PERFORM_GET_HADNLE_STRIDE:
+        {
+            buffer_handle_t hnd = va_arg(args, buffer_handle_t);
+            int *stride = va_arg(args, int *);
+
+            if(stride > NULL)
+                err = gralloc_drm_handle_get_stride(hnd, stride);
+            else
+                err = -EINVAL;
+        }
+        break;
+    case GRALLOC_MODULE_PERFORM_GET_HADNLE_BYTE_STRIDE:
+        {
+            buffer_handle_t hnd = va_arg(args, buffer_handle_t);
+            int *byte_stride = va_arg(args, int *);
+
+            if(byte_stride > NULL)
+                err = gralloc_drm_handle_get_byte_stride(hnd, byte_stride);
+            else
+                err = -EINVAL;
+        }
+        break;
+    case GRALLOC_MODULE_PERFORM_GET_HADNLE_FORMAT:
+        {
+            buffer_handle_t hnd = va_arg(args, buffer_handle_t);
+            int *format = va_arg(args, int *);
+
+            if(format > NULL)
+                err = gralloc_drm_handle_get_format(hnd, format);
+            else
+                err = -EINVAL;
+        }
+        break;
+    case GRALLOC_MODULE_PERFORM_GET_HADNLE_SIZE:
+        {
+            buffer_handle_t hnd = va_arg(args, buffer_handle_t);
+            int *size = va_arg(args, int *);
+
+            if(size > NULL)
+                err = gralloc_drm_handle_get_size(hnd, size);
+            else
+                err = -EINVAL;
+        }
+        break;
     case GRALLOC_MODULE_PERFORM_GET_USAGE:
         {
             buffer_handle_t hnd = va_arg(args, buffer_handle_t);

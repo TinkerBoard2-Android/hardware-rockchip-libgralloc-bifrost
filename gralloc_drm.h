@@ -36,14 +36,6 @@ extern "C" {
 struct gralloc_drm_t;
 struct gralloc_drm_bo_t;
 
-enum {
-	GRALLOC_MODULE_PERFORM_GET_DRM_FD                = 0x08000002,
-	GRALLOC_MODULE_PERFORM_GET_HADNLE_PRIME_FD       = 0x08100002,
-	GRALLOC_MODULE_PERFORM_GET_HADNLE_ATTRIBUTES     = 0x08100004,
-	GRALLOC_MODULE_PERFORM_GET_INTERNAL_FORMAT       = 0x08100006,
-	GRALLOC_MODULE_PERFORM_GET_USAGE                 = 0x0feeff03,
-};
-
 struct gralloc_drm_t *gralloc_drm_create(void);
 void gralloc_drm_destroy(struct gralloc_drm_t *drm);
 
@@ -138,7 +130,12 @@ int gralloc_drm_handle_get_prime_fd(buffer_handle_t _handle, int *fd);
 int gralloc_drm_handle_get_attributes(buffer_handle_t _handle, void *attrs);
 
 int gralloc_drm_handle_get_internal_format(buffer_handle_t _handle, uint64_t *internal_format);
-
+int gralloc_drm_handle_get_width(buffer_handle_t _handle, int *widht);
+int gralloc_drm_handle_get_height(buffer_handle_t _handle, int *height);
+int gralloc_drm_handle_get_stride(buffer_handle_t _handle, int *stride);
+int gralloc_drm_handle_get_byte_stride(buffer_handle_t _handle, int *byte_stride);
+int gralloc_drm_handle_get_format(buffer_handle_t _handle, int *format);
+int gralloc_drm_handle_get_size(buffer_handle_t _handle, int *size);
 int gralloc_drm_handle_get_usage(buffer_handle_t _handle, int *usage);
 
 #ifdef __cplusplus

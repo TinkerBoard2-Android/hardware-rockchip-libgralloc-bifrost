@@ -109,8 +109,14 @@ uint64_t gralloc_select_format(int req_format, int usage, int buffer_size)
 
 	(void) usage;
 	(void) buffer_size;
-	return (uint64_t) req_format;
 
+    if(req_format == HAL_PIXEL_FORMAT_YCrCb_NV12_10 && (usage & ARM_P010))
+    {
+        ALOGV("rk_debug force GRALLOC_ARM_HAL_FORMAT_INDEXED_P010 usage=0x%x",usage);
+        return (GRALLOC_ARM_HAL_FORMAT_INDEXED_P010 | GRALLOC_ARM_INTFMT_EXTENDED_YUV);
+    }
+    else
+        return (uint64_t) req_format;
 #else
 	uint64_t new_format = req_format;
 	int intformat_ind;

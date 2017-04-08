@@ -21,6 +21,7 @@
 
 #include <hardware/hardware.h>
 
+#define ARM_P010            0x4000000
 
 #define GRALLOC_ARM_INTFMT_EXTENSION_BIT_START     32
 

@@ -20,6 +20,22 @@
 
 #define UNUSED(...) (void)(__VA_ARGS__)
 
+/* memory type definitions. */
+enum drm_rockchip_gem_mem_type {
+	/* Physically Continuous memory and used as default. */
+	ROCKCHIP_BO_CONTIG	= 0 << 0,
+	/* Physically Non-Continuous memory. */
+	ROCKCHIP_BO_NONCONTIG	= 1 << 0,
+	/* non-cachable mapping and used as default. */
+	ROCKCHIP_BO_NONCACHABLE	= 0 << 1,
+	/* cachable mapping. */
+	ROCKCHIP_BO_CACHABLE	= 1 << 1,
+	/* write-combine mapping. */
+	ROCKCHIP_BO_WC		= 1 << 2,
+	ROCKCHIP_BO_MASK	= ROCKCHIP_BO_NONCONTIG | ROCKCHIP_BO_CACHABLE |
+					ROCKCHIP_BO_WC
+};
+
 struct rockchip_info {
 	struct gralloc_drm_drv_t base;
 
@@ -1284,7 +1300,13 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 			return NULL;
 		}
 	} else {
-		buf->bo = rockchip_bo_create(info->rockchip, size, 0);
+		uint32_t flags=0;
+		if(format == HAL_PIXEL_FORMAT_YCrCb_NV12_10)
+		{
+			//set cache flag
+			flags = ROCKCHIP_BO_CACHABLE;
+		}
+		buf->bo = rockchip_bo_create(info->rockchip, size, flags);
 		if (!buf->bo) {
 #if RK_DRM_GRALLOC
 			AERR("failed to allocate bo %dx%dx%dx%zd\n",
@@ -1365,7 +1387,10 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 	switch (private_usage)
 	{
 		case 0:
-			handle->yuv_info = MALI_YUV_BT601_NARROW;
+			if(usage & ARM_P010)
+				handle->yuv_info = MALI_YUV_BT709_WIDE;//MALI_YUV_BT601_NARROW;
+			else
+				handle->yuv_info = MALI_YUV_BT601_NARROW;
 			break;
 		case GRALLOC_USAGE_PRIVATE_1:
 			handle->yuv_info = MALI_YUV_BT601_WIDE;
@@ -1393,8 +1418,9 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
         handle->name = 0;
 	buf->base.handle = handle;
 
-        AINF("leave, w : %d, h : %d, format : 0x%x,internal_format : 0x%llx, usage : 0x%x. size=%d",
-                handle->width, handle->height, handle->format,internal_format, handle->usage, handle->size);
+        AINF("leave, w : %d, h : %d, format : 0x%x,internal_format : 0x%llx, usage : 0x%x. size=%d,pixel_stride=%d,byte_stride=%d",
+                handle->width, handle->height, handle->format,internal_format, handle->usage, handle->size,
+                pixel_stride,byte_stride);
         AINF("leave: prime_fd=%d,share_attr_fd=%d",handle->prime_fd,handle->share_attr_fd);
 	return &buf->base;
 

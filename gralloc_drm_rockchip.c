@@ -958,6 +958,10 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
         bool fmt_chg = false;
         int fmt_bak = format;
         void *addr = NULL;
+#if USE_AFBC_LAYER
+	char framebuffer_size[PROPERTY_VALUE_MAX];
+	uint32_t width, height, vrefresh;
+#endif
 
         AINF("enter, w : %d, h : %d, format : 0x%x, usage : 0x%x.", w, h, format, usage);
 
@@ -988,21 +992,27 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
         alloc_for_arm_afbc_yuv = (internal_format & GRALLOC_ARM_INTFMT_ARM_AFBC_YUV) == GRALLOC_ARM_INTFMT_ARM_AFBC_YUV;
 
 #if USE_AFBC_LAYER
+	property_get("persist.sys.framebuffer.main", framebuffer_size, "0x0@60");
+	sscanf(framebuffer_size, "%dx%d@%d", &width, &height, &vrefresh);
+	//Vop cann't support 4K AFBC layer.
+	if (height < 2160)
+	{
 #define MAGIC_USAGE_FOR_AFBC_LAYER     (0x88)
-    if (!(usage & GRALLOC_USAGE_HW_FB)) {
-            if (!(usage & GRALLOC_USAGE_EXTERNAL_DISP) &&
-                MAGIC_USAGE_FOR_AFBC_LAYER == (usage & MAGIC_USAGE_FOR_AFBC_LAYER) ) {
-                internal_format = GRALLOC_ARM_INTFMT_AFBC | GRALLOC_ARM_HAL_FORMAT_INDEXED_RGBA_8888;
-                AWAR("use_afbc_layer: force to set 'internal_format' to 0x%llx for usage '0x%x'.", internal_format, usage);
-            }
-    } else {
-        if(!(usage & GRALLOC_USAGE_EXTERNAL_DISP) &&
-           MAGIC_USAGE_FOR_AFBC_LAYER != (usage & MAGIC_USAGE_FOR_AFBC_LAYER)) {
-                internal_format = GRALLOC_ARM_INTFMT_AFBC | GRALLOC_ARM_HAL_FORMAT_INDEXED_RGBA_8888;
-                AWAR("use_afbc_layer: force to set 'internal_format' to 0x%llx for buffer_for_fb_target_layer.",
-                internal_format);
-        }
-    }
+	    if (!(usage & GRALLOC_USAGE_HW_FB)) {
+	            if (!(usage & GRALLOC_USAGE_EXTERNAL_DISP) &&
+	                MAGIC_USAGE_FOR_AFBC_LAYER == (usage & MAGIC_USAGE_FOR_AFBC_LAYER) ) {
+	                internal_format = GRALLOC_ARM_INTFMT_AFBC | GRALLOC_ARM_HAL_FORMAT_INDEXED_RGBA_8888;
+	                AWAR("use_afbc_layer: force to set 'internal_format' to 0x%llx for usage '0x%x'.", internal_format, usage);
+	            }
+	    } else {
+	        if(!(usage & GRALLOC_USAGE_EXTERNAL_DISP) &&
+	           MAGIC_USAGE_FOR_AFBC_LAYER != (usage & MAGIC_USAGE_FOR_AFBC_LAYER)) {
+	                internal_format = GRALLOC_ARM_INTFMT_AFBC | GRALLOC_ARM_HAL_FORMAT_INDEXED_RGBA_8888;
+	                AWAR("use_afbc_layer: force to set 'internal_format' to 0x%llx for buffer_for_fb_target_layer.",
+	                internal_format);
+	        }
+	    }
+	}
 #endif
 
 	if (internal_format & (GRALLOC_ARM_INTFMT_AFBC | GRALLOC_ARM_INTFMT_AFBC_SPLITBLK | GRALLOC_ARM_INTFMT_AFBC_WIDEBLK))

@@ -1,5 +1,10 @@
 #define LOG_TAG "GRALLOC-ROCKCHIP"
 
+#define LOG_TAG "mali_so"
+#define ENABLE_DEBUG_LOG
+#include <log/custom_log.h>
+
+
 #include <cutils/log.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -1301,6 +1306,14 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		}
 	} else {
 		uint32_t flags=0;
+
+        if ( has_usage_flags(usage, GRALLOC_USAGE_SW_WRITE_OFTEN)
+            || has_usage_flags(usage, GRALLOC_USAGE_SW_READ_OFTEN) )
+        {
+            D("to ask for cachable buffer for CPU access, usage : 0x%x", usage);
+            flags = ROCKCHIP_BO_CACHABLE;
+        }
+
 		if(format == HAL_PIXEL_FORMAT_YCrCb_NV12_10)
 		{
 			//set cache flag

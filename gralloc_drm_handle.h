@@ -28,7 +28,9 @@
 #include <cutils/native_handle.h>
 #include <system/graphics.h>
 #include <hardware/gralloc.h>
-#include "format_chooser.h"
+
+#include "mali_gralloc_formats.h"
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -103,6 +105,9 @@ struct gralloc_drm_handle_t {
                 off_t    offset;
                 uint64_t padding4;
         };
+
+    uint64_t consumer_usage;
+    uint64_t producer_usage;
 
 #if MALI_AFBC_GRALLOC == 1
 	// locally mapped shared attribute area

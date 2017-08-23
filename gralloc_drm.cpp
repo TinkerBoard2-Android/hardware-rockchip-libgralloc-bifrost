@@ -299,6 +299,8 @@ struct gralloc_drm_bo_t *gralloc_drm_bo_create(struct gralloc_drm_t *drm,
 
 	handle->data_owner = gralloc_drm_get_pid();
 	handle->data = bo;
+    handle->consumer_usage = usage;
+    handle->producer_usage = usage;
 	handle->ref = 0;
 
 	return bo;

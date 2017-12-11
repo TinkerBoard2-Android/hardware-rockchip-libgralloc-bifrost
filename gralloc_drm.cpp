@@ -446,9 +446,11 @@ int gralloc_drm_bo_lock(struct gralloc_drm_bo_t *bo,
 
 		if (!(bo->handle->usage & GRALLOC_USAGE_HW_FB)
 		&&  !(bo->handle->usage & GRALLOC_USAGE_HW_TEXTURE)) {
-			ALOGE("bo.usage:x%X/usage:x%X is not GRALLOC_USAGE_HW_FB or GRALLOC_USAGE_HW_TEXTURE"
+			ALOGE("bo.usage:0x%X/usage:0x%X is not GRALLOC_USAGE_HW_FB or GRALLOC_USAGE_HW_TEXTURE"
 				,bo->handle->usage,usage);
-			return -EINVAL;
+			//zxl: remove this limit for fail of cts as follow:
+			//		run cts -o -a arm64-v8a --skip-all-system-status-check  -m CtsRenderscriptTestCases -t android.renderscript.cts.AllocationCreateAllocationsTest#testMultipleIoReceive_USAGE_IO_INPUT
+//			return -EINVAL;
 		}
 	}
 

@@ -94,8 +94,9 @@ LOCAL_SHARED_LIBRARIES := \
 	libdrm \
 	liblog \
 	libcutils \
-	libhardware_legacy \
-	libutils
+	libutils \
+
+	# libhardware_legacy \
 
 ifneq ($(filter $(intel_drivers), $(DRM_GPU_DRIVERS)),)
 LOCAL_SRC_FILES += gralloc_drm_intel.c
@@ -170,10 +171,12 @@ AFBC_FILES =
 endif
 
 LOCAL_C_INCLUDES += hardware/rockchip/librkvpu
-LOCAL_SRC_FILES += gralloc_drm_rockchip.c \
-		format_chooser.cpp \
-		format_chooser_blockinit.cpp \
-		$(AFBC_FILES)
+LOCAL_SRC_FILES += gralloc_drm_rockchip.cpp \
+	mali_gralloc_formats.cpp \
+	$(AFBC_FILES)
+
+LOCAL_SHARED_LIBRARIES += libdrm_rockchip
+
 #RK_DRM_GRALLOC for rockchip drm gralloc
 #RK_DRM_GRALLOC_DEBUG for rockchip drm gralloc debug.
 MAJOR_VERSION := "RK_GRAPHICS_VER=commit-id:$(shell cd $(LOCAL_PATH) && git log  -1 --oneline | awk '{print $$1}')"
@@ -181,6 +184,7 @@ LOCAL_CFLAGS +=-DRK_DRM_GRALLOC=1 -DRK_DRM_GRALLOC_DEBUG=0 -DENABLE_ROCKCHIP -DP
 
 # disable arm_format_selection on rk platforms, by default.
 LOCAL_CFLAGS += -DGRALLOC_ARM_FORMAT_SELECTION_DISABLE
+LOCAL_CFLAGS += -DGRALLOC_LIBRARY_BUILD=1 -DGRALLOC_USE_GRALLOC1_API=0
 
 ifeq ($(GRALLOC_FB_SWAP_RED_BLUE),1)
 LOCAL_CFLAGS += -DGRALLOC_FB_SWAP_RED_BLUE
@@ -193,8 +197,6 @@ endif
 ifdef PLATFORM_CFLAGS
 LOCAL_CFLAGS += $(PLATFORM_CFLAGS)
 endif
-
-LOCAL_SHARED_LIBRARIES += libdrm_rockchip
 
 endif
 
@@ -230,6 +232,7 @@ LOCAL_SHARED_LIBRARIES += libdl
 endif # DRM_USES_PIPE
 include $(BUILD_SHARED_LIBRARY)
 
+# ------------ #
 
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES := \

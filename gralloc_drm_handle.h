@@ -24,12 +24,17 @@
 #ifndef _GRALLOC_DRM_HANDLE_H_
 #define _GRALLOC_DRM_HANDLE_H_
 
+// #define ENABLE_DEBUG_LOG
+#include <log/custom_log.h>
+
 #include <system/window.h>
 #include <cutils/native_handle.h>
 #include <system/graphics.h>
 #include <hardware/gralloc.h>
 
+#include "mali_gralloc_usages.h"
 #include "mali_gralloc_formats.h"
+#include "mali_gralloc_private_interface_types.h"
 
 
 #ifdef __cplusplus
@@ -38,14 +43,6 @@ extern "C" {
 
 #if RK_DRM_GRALLOC
 #define GRALLOC_UN_USED(arg)     (arg=arg)
-typedef enum
-{
-	MALI_YUV_NO_INFO,
-	MALI_YUV_BT601_NARROW,
-	MALI_YUV_BT601_WIDE,
-	MALI_YUV_BT709_NARROW,
-	MALI_YUV_BT709_WIDE
-} mali_gralloc_yuv_info;
 
 typedef enum
 {
@@ -76,11 +73,14 @@ typedef enum
 #endif
 #endif
 
+#else
+#error
 #endif
 
 struct gralloc_drm_bo_t;
 
-struct gralloc_drm_handle_t {
+struct gralloc_drm_handle_t
+{
 	native_handle_t base;
 
 	/* file descriptors */
@@ -89,6 +89,8 @@ struct gralloc_drm_handle_t {
 #if RK_DRM_GRALLOC
 #if MALI_AFBC_GRALLOC == 1
 	int     share_attr_fd;
+#else
+#error
 #endif
         mali_dpy_type dpy_type;
 
@@ -177,6 +179,39 @@ static inline struct gralloc_drm_handle_t *gralloc_drm_handle(buffer_handle_t _h
 	}
 
 	return handle;
+}
+
+static inline int gralloc_drm_validate_handle(const native_handle *h)
+{
+	struct gralloc_drm_handle_t *handle = (struct gralloc_drm_handle_t *)h;
+
+    if ( NULL == handle )
+    {
+        E("'handle' is NULL.")
+        return -EINVAL;
+    }
+    else if ( handle->base.version != sizeof(handle->base) )
+    {
+        E("unexpected 'base.version' : %d; size of 'base' : %zu.", handle->base.version, sizeof(handle->base) );
+        return -EINVAL;
+    }
+    else if ( handle->base.numInts != GRALLOC_DRM_HANDLE_NUM_INTS )
+    {
+        E("unexpected 'base.numInts' : %d; expect %zu.", handle->base.numInts, GRALLOC_DRM_HANDLE_NUM_INTS);
+        return -EINVAL;
+    }
+    else if ( handle->base.numFds != GRALLOC_DRM_HANDLE_NUM_FDS )
+    {
+        E("unexpected 'base.numFds' : %d; expect %d.", handle->base.numFds, GRALLOC_DRM_HANDLE_NUM_FDS);
+        return -EINVAL;
+    }
+    else if ( handle->magic != GRALLOC_DRM_HANDLE_MAGIC )
+    {
+        E("unexpected 'magic' : 0x%x; expect 0x%x.", handle->magic, GRALLOC_DRM_HANDLE_MAGIC);
+        return -EINVAL;
+    }
+
+    return 0;
 }
 
 static inline void gralloc_drm_unlock_handle(buffer_handle_t _handle)

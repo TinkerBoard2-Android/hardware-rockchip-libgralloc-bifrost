@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 ARM Limited. All rights reserved.
+ * Copyright (C) 2010-2017 ARM Limited. All rights reserved.
  *
  * Copyright (C) 2008 The Android Open Source Project
  *
@@ -19,40 +19,33 @@
 #ifndef GRALLOC_HELPER_H_
 #define GRALLOC_HELPER_H_
 
-#include <stdbool.h>
 #include <sys/mman.h>
-#include <system/graphics.h>
-#include "format_chooser.h"
+#include <android/log.h>
 
-inline size_t round_up_to_page_size(size_t x)
+#ifndef AWAR
+#define AWAR(fmt, args...) \
+	__android_log_print(ANDROID_LOG_WARN, "[Gralloc-Warning]", "%s:%d " fmt, __func__, __LINE__, ##args)
+#endif
+#ifndef AINF
+#define AINF(fmt, args...) __android_log_print(ANDROID_LOG_INFO, "[Gralloc]", fmt, ##args)
+#endif
+#ifndef AERR
+#define AERR(fmt, args...) \
+	__android_log_print(ANDROID_LOG_ERROR, "[Gralloc-ERROR]", "%s:%d " fmt, __func__, __LINE__, ##args)
+#endif
+#ifndef AERR_IF
+#define AERR_IF(eq, fmt, args...) \
+	if ((eq))                     \
+	AERR(fmt, args)
+#endif
+
+#define GRALLOC_ALIGN(value, base) (((value) + ((base)-1)) & ~((base)-1))
+
+#define GRALLOC_UNUSED(x) ((void)x)
+
+static inline size_t round_up_to_page_size(size_t x)
 {
-    return (x + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1);
-}
-
-/** @brief Maps an Android flexible YUV format to the underlying format.
- *
- * @param format The format, including the internal format extension bits.
- *
- * @returns The mapped format, without the internal format extension bits.
- */
-inline uint64_t map_format( uint64_t format )
-{
-	/* Extended YUV in gralloc_arm_hal_index_format enum overlaps Android's HAL_PIXEL_FORMAT enum so check for this first */
-	int extended_yuv = (format & GRALLOC_ARM_INTFMT_EXTENDED_YUV) == GRALLOC_ARM_INTFMT_EXTENDED_YUV;
-
-	/* Lose the extension bits */
-	format &= GRALLOC_ARM_INTFMT_FMT_MASK;
-
-	if (!extended_yuv)
-	{
-		switch(format)
-		{
-			case HAL_PIXEL_FORMAT_YCbCr_420_888:
-			format = GRALLOC_MAPPED_HAL_PIXEL_FORMAT_YCbCr_420_888;
-			break;
-		}
-	}
-	return format;
+	return (x + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1);
 }
 
 inline bool has_usage_flags(int usage, int flags)

@@ -34,6 +34,8 @@
 #include "gralloc_drm.h"
 #include "gralloc_drm_priv.h"
 #include "gralloc_drm_handle.h"
+#include "mali_gralloc_formats.h"
+
 #include <inttypes.h>
 
 #include <utils/CallStack.h>
@@ -239,7 +241,6 @@ static int drm_mod_lock(const gralloc_module_t *mod, buffer_handle_t handle,
 	return err;
 }
 
-#define GRALLOC_ALIGN(value, base) (((value) + ((base) - 1)) & ~((base) - 1))
 static int drm_mod_lock_ycbcr(gralloc_module_t const* module,
 				buffer_handle_t handle, int usage,
 				int l, int t, int w, int h, android_ycbcr *ycbcr)
@@ -273,16 +274,16 @@ static int drm_mod_lock_ycbcr(gralloc_module_t const* module,
 		int c_stride = 0;
 		int step = 0;
 
-		/* Map format if necessary (also removes internal extension bits) */
-		uint64_t mapped_format = map_format(hnd->internal_format);
+        uint64_t base_format = (hnd->internal_format) & MALI_GRALLOC_INTFMT_FMT_MASK;
 
 		int ret = gralloc_drm_bo_lock(bo, hnd->usage,
 				0, 0, hnd->width, hnd->height,(void **)&cpu_addr);
 
-		switch (mapped_format)
+		switch (base_format)
 		{
-			case GRALLOC_ARM_HAL_FORMAT_INDEXED_NV12:
-			case HAL_PIXEL_FORMAT_YCrCb_NV12:
+			// case GRALLOC_ARM_HAL_FORMAT_INDEXED_NV12:
+			case MALI_GRALLOC_FORMAT_INTERNAL_NV12:
+            case HAL_PIXEL_FORMAT_YCrCb_NV12:
 			case HAL_PIXEL_FORMAT_YCbCr_420_888:
 				c_stride = y_stride;
 				/* Y plane, UV plane */
@@ -291,7 +292,8 @@ static int drm_mod_lock_ycbcr(gralloc_module_t const* module,
 				step = 2;
 				break;
 
-			case GRALLOC_ARM_HAL_FORMAT_INDEXED_NV21:
+			// case GRALLOC_ARM_HAL_FORMAT_INDEXED_NV21:
+            case MALI_GRALLOC_FORMAT_INTERNAL_NV21:
 				c_stride = y_stride;
 				/* Y plane, UV plane */
 				v_offset = y_size;
@@ -300,7 +302,8 @@ static int drm_mod_lock_ycbcr(gralloc_module_t const* module,
 				break;
 
 			case HAL_PIXEL_FORMAT_YV12:
-			case GRALLOC_ARM_HAL_FORMAT_INDEXED_YV12:
+			// case GRALLOC_ARM_HAL_FORMAT_INDEXED_YV12:
+            // case MALI_GRALLOC_FORMAT_INTERNAL_YV12:
 			{
 				int c_size;
 
@@ -498,8 +501,6 @@ drm_module_t::drm_module_t()
 #if RK_DRM_GRALLOC
     refcount = 0;
 #endif
-
-    initialize_blk_conf();
 }
 
 struct drm_module_t HAL_MODULE_INFO_SYM;

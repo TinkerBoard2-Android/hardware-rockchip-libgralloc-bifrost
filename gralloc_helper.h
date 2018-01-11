@@ -48,9 +48,4 @@ static inline size_t round_up_to_page_size(size_t x)
 	return (x + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1);
 }
 
-inline bool has_usage_flags(int usage, int flags)
-{
-    return (0 != (usage & flags) );
-}
-
 #endif /* GRALLOC_HELPER_H_ */

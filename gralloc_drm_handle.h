@@ -27,7 +27,6 @@
 // #define ENABLE_DEBUG_LOG
 #include <log/custom_log.h>
 
-#include <system/window.h>
 #include <cutils/native_handle.h>
 #include <system/graphics.h>
 #include <hardware/gralloc.h>

@@ -76,6 +76,10 @@ typedef enum
 #error
 #endif
 
+#if MALI_AFBC_GRALLOC != 1
+#define MALI_AFBC_GRALLOC 1
+#endif
+
 struct gralloc_drm_bo_t;
 
 struct gralloc_drm_handle_t

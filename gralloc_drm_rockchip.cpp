@@ -29,7 +29,6 @@ extern "C" {
 
 #define UNUSED(...) (void)(__VA_ARGS__)
 
-
 struct dma_buf_sync {
         __u64 flags;
 };
@@ -1472,7 +1471,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		flags = ROCKCHIP_BO_CACHABLE;
 	}
 
-	if(usage & GRALLOC_USAGE_TO_USE_PHY_CONT)
+	if(USAGE_CONTAIN_VALUE(GRALLOC_USAGE_TO_USE_PHY_CONT,GRALLOC_USAGE_ROT_MASK))
 	{
 		flags |= ROCKCHIP_BO_CONTIG;
 		ALOGD_IF(RK_DRM_GRALLOC_DEBUG, "try to use Physically Continuous memory\n");
@@ -1516,16 +1515,6 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 			drmIoctl(info->fd, DRM_IOCTL_GEM_CLOSE, &args);
 			return NULL;
 		}
-#if 0
-		if(usage & GRALLOC_USAGE_TO_USE_PHY_CONT)
-		{
-			phys_arg.handle = gem_handle;
-			ret = drmIoctl(info->fd, DRM_IOCTL_ROCKCHIP_GEM_GET_PHYS, &phys_arg);
-			if (ret)
-				ALOGE("failed to get phy address: %s\n", strerror(errno));
-			ALOGD_IF(RK_DRM_GRALLOC_DEBUG,"get phys 0x%x\n", phys_arg.phy_addr);
-		}
-#endif
 	} else {
 		buf->bo = rockchip_bo_create(info->rockchip, size, flags);
 		if (!buf->bo) {
@@ -1558,7 +1547,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 
 		buf->base.fb_handle = gem_handle;
 
-		if(usage & GRALLOC_USAGE_TO_USE_PHY_CONT)
+		if(USAGE_CONTAIN_VALUE(GRALLOC_USAGE_TO_USE_PHY_CONT,GRALLOC_USAGE_ROT_MASK))
 		{
 			phys_arg.handle = gem_handle;
 			ret = drmIoctl(info->fd, DRM_IOCTL_ROCKCHIP_GEM_GET_PHYS, &phys_arg);
@@ -1647,7 +1636,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 	switch (private_usage)
 	{
 		case 0:
-			if(usage & ARM_P010)
+			if(USAGE_CONTAIN_VALUE(GRALLOC_USAGE_TO_USE_ARM_P010,GRALLOC_USAGE_ROT_MASK))
 				handle->yuv_info = MALI_YUV_BT709_WIDE;//MALI_YUV_BT601_NARROW;
 			else
 				handle->yuv_info = MALI_YUV_BT601_NARROW;
@@ -1667,7 +1656,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
     switch (usage & MALI_GRALLOC_USAGE_YUV_CONF_MASK)
     {
         case MALI_GRALLOC_USAGE_YUV_CONF_0:
-			if ( usage & ARM_P010 )
+            if(USAGE_CONTAIN_VALUE(GRALLOC_USAGE_TO_USE_ARM_P010,GRALLOC_USAGE_ROT_MASK))
             {
 				handle->yuv_info = MALI_YUV_BT709_WIDE; // for rk_hdr.
             }

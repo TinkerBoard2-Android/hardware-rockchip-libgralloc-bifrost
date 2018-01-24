@@ -64,7 +64,7 @@ typedef enum
 #elif defined(GRALLOC_MODULE_API_VERSION_0_3)
 
 /* for rk_hdr.*/
-#define ARM_P010            0x4000000
+#define USAGE_CONTAIN_VALUE(value,mask) ((usage & mask) == value)
 
 typedef enum
 {

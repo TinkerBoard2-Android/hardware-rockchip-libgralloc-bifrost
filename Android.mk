@@ -127,8 +127,8 @@ MALI_USE_YUV_AFBC_WIDEBLK?=0
 # AFBC buffers should be initialised after allocation in all rk platforms.
 GRALLOC_INIT_AFBC?=1
 
-# use afbc layer
-USE_AFBC_LAYER = 0
+# for bifrost GPU, use afbc layer by default.
+USE_AFBC_LAYER = 1
 
 ifeq ($(strip $(TARGET_BOARD_PLATFORM)),rk3399)
 USE_AFBC_LAYER = 1

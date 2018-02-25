@@ -1,6 +1,6 @@
 #define LOG_TAG "GRALLOC-ROCKCHIP"
 
-#define ENABLE_DEBUG_LOG
+// #define ENABLE_DEBUG_LOG
 #include <log/custom_log.h>
 
 
@@ -1093,15 +1093,14 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
         bool fmt_chg = false;
         int fmt_bak = format;
         void *addr = NULL;
-// #if USE_AFBC_LAYER
-#if 0
+#if USE_AFBC_LAYER
 	char framebuffer_size[PROPERTY_VALUE_MAX];
 	uint32_t width, height, vrefresh;
 #endif
 	uint32_t flags = 0;
 	struct drm_rockchip_gem_phys phys_arg;
 
-        ALOGD("enter, w : %d, h : %d, format : 0x%x, usage : 0x%x.", w, h, format, usage);
+        D("enter, w : %d, h : %d, format : 0x%x, usage : 0x%x.", w, h, format, usage);
 
 	phys_arg.phy_addr = 0;
 
@@ -1130,9 +1129,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
                                                  MALI_GRALLOC_FORMAT_TYPE_USAGE,
                                                  usage,
                                                  w * h);
-
-// #if USE_AFBC_LAYER
-#if 0
+#if USE_AFBC_LAYER
 	property_get("persist.sys.framebuffer.main", framebuffer_size, "0x0@60");
 	sscanf(framebuffer_size, "%dx%d@%d", &width, &height, &vrefresh);
 	//Vop cann't support 4K AFBC layer.
@@ -1142,20 +1139,25 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 	    if (!(usage & GRALLOC_USAGE_HW_FB)) {
 	            if (!(usage & GRALLOC_USAGE_EXTERNAL_DISP) &&
 	                MAGIC_USAGE_FOR_AFBC_LAYER == (usage & MAGIC_USAGE_FOR_AFBC_LAYER) ) {
-	                internal_format = GRALLOC_ARM_INTFMT_AFBC | GRALLOC_ARM_HAL_FORMAT_INDEXED_RGBA_8888; // .T : 修改.
-	                AWAR("use_afbc_layer: force to set 'internal_format' to 0x%llx for usage '0x%x'.", internal_format, usage);
+	                internal_format = MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888 | MALI_GRALLOC_INTFMT_AFBC_BASIC;
+	                D("use_afbc_layer: force to set 'internal_format' to 0x%llx for usage '0x%x'.", internal_format, usage);
 	            }
 	    } else {
-	        if(!(usage & GRALLOC_USAGE_EXTERNAL_DISP) &&
-	           MAGIC_USAGE_FOR_AFBC_LAYER != (usage & MAGIC_USAGE_FOR_AFBC_LAYER)) {
-	                internal_format = GRALLOC_ARM_INTFMT_AFBC | GRALLOC_ARM_HAL_FORMAT_INDEXED_RGBA_8888;
-	                property_set("sys.gmali.fbdc_target","1");
-	                AWAR("use_afbc_layer: force to set 'internal_format' to 0x%llx for buffer_for_fb_target_layer.",
-	                internal_format);
+	        if ( !(usage & GRALLOC_USAGE_EXTERNAL_DISP)
+                && MAGIC_USAGE_FOR_AFBC_LAYER != (usage & MAGIC_USAGE_FOR_AFBC_LAYER) )
+            {
+                internal_format = MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888 | MALI_GRALLOC_INTFMT_AFBC_BASIC;
+
+                if ( handle->prime_fd < 0 ) // 只在将实际分配 buffer 的时候打印.
+                {
+                    I("use_afbc_layer: force to set 'internal_format' to 0x%" PRIu64 " for buffer_for_fb_target_layer.",
+                      internal_format);
+                }
+                property_set("sys.gmali.fbdc_target","1");
 	        }
 	        else
 	        {
-			property_set("sys.gmali.fbdc_target","0");
+			    property_set("sys.gmali.fbdc_target","0");
 	        }
 	    }
 	}
@@ -1483,6 +1485,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		ALOGD_IF(RK_DRM_GRALLOC_DEBUG, "try to use secure memory\n");
 	}
 
+    /* 若 buufer 实际上已经分配 (通常在另一个进程中), 则... */
 	if (handle->prime_fd >= 0) {
 		ret = drmPrimeFDToHandle(info->fd, handle->prime_fd,
 			&gem_handle);
@@ -1515,7 +1518,9 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 			drmIoctl(info->fd, DRM_IOCTL_GEM_CLOSE, &args);
 			return NULL;
 		}
-	} else {
+	}
+    else    // if (handle->prime_fd >= 0)
+    {
 		buf->bo = rockchip_bo_create(info->rockchip, size, flags);
 		if (!buf->bo) {
 #if RK_DRM_GRALLOC
@@ -1555,7 +1560,6 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 				ALOGE("failed to get phy address: %s\n", strerror(errno));
 			ALOGD_IF(RK_DRM_GRALLOC_DEBUG,"get phys 0x%x\n", phys_arg.phy_addr);
 		}
-	}
 
 #if GRALLOC_INIT_AFBC == 1
         if (!(usage & GRALLOC_USAGE_PROTECTED))
@@ -1565,14 +1569,22 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
                         AERR("failed to map bo\n");
                         goto err_unref;
                 }
+        }
 
-                    
-                if ( internal_format & MALI_GRALLOC_INTFMT_AFBCENABLE_MASK )
-                {
-                        init_afbc((uint8_t*)addr, internal_format, w, h);
-                }
+        if ( internal_format & MALI_GRALLOC_INTFMT_AFBCENABLE_MASK )
+        {
+            if ( addr != NULL )
+            {
+                D("to init afbc_buffer, addr : %p", addr);
+                init_afbc((uint8_t*)addr, internal_format, w, h);
+            }
+            else
+            {
+                E("can't init afbc_buffer.");
+            }
         }
 #endif /* GRALLOC_INIT_AFBC == 1 */
+	}   // if (handle->prime_fd >= 0)
 
 #if RK_DRM_GRALLOC
 #if MALI_AFBC_GRALLOC == 1

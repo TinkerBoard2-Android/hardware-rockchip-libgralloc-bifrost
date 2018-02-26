@@ -22,7 +22,10 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/mman.h>
+
+#include "rk_drm_gralloc_config.h"
 #include "gralloc_drm_handle.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

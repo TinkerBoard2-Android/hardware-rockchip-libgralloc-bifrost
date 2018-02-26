@@ -13,6 +13,7 @@ extern "C" {
 #include <rockchip/rockchip_drmif.h>
 }
 
+#include "rk_drm_gralloc_config.h"
 #include "gralloc_helper.h"
 #include "gralloc_drm.h"
 #include "gralloc_drm_priv.h"

@@ -27,6 +27,8 @@
 #include <hardware/gralloc.h>
 #include <system/graphics.h>
 
+#include "rk_drm_gralloc_config.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

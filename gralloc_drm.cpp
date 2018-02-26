@@ -35,6 +35,7 @@
 
 #include <vector>
 
+#include "rk_drm_gralloc_config.h"
 #include "gralloc_drm.h"
 #include "gralloc_drm_priv.h"
 #include "gralloc_buffer_priv.h"

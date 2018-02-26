@@ -1015,14 +1015,19 @@ static bool get_rk_nv12_10bit_stride_and_size (int width, int height, int* pixel
 
 static void init_afbc(uint8_t *buf, uint64_t internal_format, int w, int h)
 {
-	uint32_t n_headers = (w * h) / 64;
+	uint32_t n_headers = (w * h) / 256;
 	uint32_t body_offset = n_headers * 16;
 	uint32_t headers[][4] = {
-		{ body_offset, 0x1, 0x0, 0x0 }, /* Layouts 0, 3, 4 */
-		{ (body_offset + (1 << 28)), 0x200040, 0x4000, 0x80 } /* Layouts 1, 5 */
+		{ body_offset, 0x1, 0x10000, 0x0 }, /* Layouts 0, 3, 4 */
+		{ (body_offset + (1 << 28)), 0x80200040, 0x1004000, 0x20080 } /* Layouts 1, 5 */
 	};
 	uint32_t i, layout;
 
+	/* For AFBC 1.2, header buffer can be initilized to 0 for Layouts 0, 3, 4 */
+	if (internal_format & MALI_GRALLOC_INTFMT_AFBC_TILED_HEADERS)
+	{
+		memset(headers[0], 0, sizeof(uint32_t) * 4);
+	}
 	/* map format if necessary (also removes internal extension bits) */
 	uint64_t base_format = internal_format & MALI_GRALLOC_INTFMT_FMT_MASK;
 

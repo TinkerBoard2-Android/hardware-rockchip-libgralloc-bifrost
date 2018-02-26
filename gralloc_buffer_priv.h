@@ -38,6 +38,7 @@ struct attr_region
 	int crop_width;
 	int use_yuv_transform;
 	int use_sparse_alloc;
+	mali_hdr_info hdr_info;
 } __attribute__((packed));
 
 typedef struct attr_region attr_region;
@@ -300,6 +301,11 @@ static inline int gralloc_buffer_attr_write(struct gralloc_drm_handle_t *hnd, bu
 			region->use_sparse_alloc = *val;
 			rval = 0;
 			break;
+
+		case GRALLOC_ARM_BUFFER_ATTR_HDR_INFO:
+			memcpy(&region->hdr_info, val, sizeof(mali_hdr_info));
+			rval = 0;
+			break;
 		}
 	}
 
@@ -334,6 +340,11 @@ static inline int gralloc_buffer_attr_read(struct gralloc_drm_handle_t *hnd, buf
 
 		case GRALLOC_ARM_BUFFER_ATTR_AFBC_SPARSE_ALLOC:
 			*val = region->use_sparse_alloc;
+			rval = 0;
+			break;
+
+		case GRALLOC_ARM_BUFFER_ATTR_HDR_INFO:
+			memcpy(val, &region->hdr_info, sizeof(mali_hdr_info));
 			rval = 0;
 			break;
 		}

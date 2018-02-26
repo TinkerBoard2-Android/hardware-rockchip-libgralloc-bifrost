@@ -19,6 +19,36 @@
 #ifndef MALI_GRALLOC_PRIVATE_INTERFACE_TYPES_H_
 #define MALI_GRALLOC_PRIVATE_INTERFACE_TYPES_H_
 
+#define GRALLOC_ARM_BUFFER_ATTR_HDR_INFO_SUPPORT
+
+typedef enum
+{
+	MALI_HDR_NO_INFO,
+	MALI_HDR_ST2084,
+	MALI_HDR_HLG,
+	MALI_HDR_LAST
+} mali_transfer_function;
+
+typedef struct
+{
+	//values are in units of 0.00002
+	uint16_t x;
+	uint16_t y;
+} primaries;
+
+typedef struct
+{
+	primaries r;
+	primaries g;
+	primaries b;
+	primaries w;
+	uint16_t minDisplayLuminance; // in cd/m^2
+	uint16_t maxDisplayLuminance; // in 0.0001 cd/m^2
+	uint16_t maxContentLightLevel; // in cd/m^2
+	uint16_t maxFrameAverageLightLevel; // in cd/m^2
+	mali_transfer_function eotf;
+} mali_hdr_info;
+
 enum
 {
 	/* CROP_RECT and YUV_TRANS are intended to be
@@ -35,6 +65,10 @@ enum
 
 	/* Set if the AFBC format uses sparse allocation */
 	GRALLOC_ARM_BUFFER_ATTR_AFBC_SPARSE_ALLOC = 3,
+
+	/* HDR Informations*/
+	GRALLOC_ARM_BUFFER_ATTR_HDR_INFO = 4,
+
 	GRALLOC_ARM_BUFFER_ATTR_LAST
 };
 

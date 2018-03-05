@@ -1481,6 +1481,15 @@ static void drm_gem_rockchip_destroy(struct gralloc_drm_drv_t *drv)
 	free(info);
 }
 
+static bool should_disable_afbc_in_fb_target_layer()
+{
+    char value[PROPERTY_VALUE_MAX];
+
+    property_get("sys.gralloc.disable_afbc", value, "0");
+
+    return (0 == strcmp("1", value) );
+}
+
 static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		struct gralloc_drm_drv_t *drv,
 		struct gralloc_drm_handle_t *handle)
@@ -1529,6 +1538,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
                                                  MALI_GRALLOC_FORMAT_TYPE_USAGE,
                                                  usage,
                                                  w * h);
+
 #if USE_AFBC_LAYER
 	property_get("persist.sys.framebuffer.main", framebuffer_size, "0x0@60");
 	sscanf(framebuffer_size, "%dx%d@%d", &width, &height, &vrefresh);
@@ -1536,24 +1546,38 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 	if (height < 2160)
 	{
 #define MAGIC_USAGE_FOR_AFBC_LAYER     (0x88)
-	    if (!(usage & GRALLOC_USAGE_HW_FB)) {
+        /* if current buffer is NOT for fb_target_layer, ... */
+        if (!(usage & GRALLOC_USAGE_HW_FB)) {
 	            if (!(usage & GRALLOC_USAGE_EXTERNAL_DISP) &&
 	                MAGIC_USAGE_FOR_AFBC_LAYER == (usage & MAGIC_USAGE_FOR_AFBC_LAYER) ) {
 	                internal_format = MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888 | MALI_GRALLOC_INTFMT_AFBC_BASIC;
 	                D("use_afbc_layer: force to set 'internal_format' to 0x%llx for usage '0x%x'.", internal_format, usage);
 	            }
-	    } else {
-	        if ( !(usage & GRALLOC_USAGE_EXTERNAL_DISP)
+        }
+        /* IS for fb_target_layer, ... */
+        else
+        {
+            if ( !(usage & GRALLOC_USAGE_EXTERNAL_DISP)     // NOT fb_target_layer for external_display
                 && MAGIC_USAGE_FOR_AFBC_LAYER != (usage & MAGIC_USAGE_FOR_AFBC_LAYER) )
             {
-                internal_format = MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888 | MALI_GRALLOC_INTFMT_AFBC_BASIC;
-
-                if ( handle->prime_fd < 0 ) // 只在将实际分配 buffer 的时候打印.
+                if ( !should_disable_afbc_in_fb_target_layer() )
                 {
-                    I("use_afbc_layer: force to set 'internal_format' to 0x%" PRIu64 " for buffer_for_fb_target_layer.",
-                      internal_format);
+                    internal_format = MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888 | MALI_GRALLOC_INTFMT_AFBC_BASIC;
+                    if ( handle->prime_fd < 0 ) // 只在将实际分配 buffer 的时候打印.
+                    {
+                        I("use_afbc_layer: force to set 'internal_format' to 0x%" PRIu64 " for buffer_for_fb_target_layer.",
+                          internal_format);
+                    }
+                    property_set("sys.gmali.fbdc_target","1");
                 }
-                property_set("sys.gmali.fbdc_target","1");
+                else
+                {
+                    if ( handle->prime_fd < 0 )
+                    {
+                        I("debug_only : not to use afbc in fb_target_layer, the original format : 0x%" PRIu64, internal_format);
+                    }
+			        property_set("sys.gmali.fbdc_target","0");
+                }
 	        }
 	        else
 	        {

@@ -1110,21 +1110,6 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 
 	phys_arg.phy_addr = 0;
 
-        if(format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED  )
-        {
-                if(usage & GRALLOC_USAGE_HW_VIDEO_ENCODER )
-                {
-                        ADBG("(usage & GRALLOC_USAGE_HW_VIDEO_ENCODER treat as NV12");
-                        format = HAL_PIXEL_FORMAT_YCrCb_NV12;
-                }
-                else
-                {
-                        ADBG("treat as NV12 888");
-                        format = HAL_PIXEL_FORMAT_RGBX_8888;
-                        fmt_chg = true;
-                }
-        }
-
 	/* Some formats require an internal width and height that may be used by
 	 * consumers/producers.
 	 */

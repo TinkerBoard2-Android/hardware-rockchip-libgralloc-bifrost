@@ -16,6 +16,10 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "gralloc"
+// #define ENABLE_DEBUG_LOG
+#include <log/custom_log.h>
+
 #include <string.h>
 #include <dlfcn.h>
 #include <inttypes.h>
@@ -33,21 +37,56 @@
 #include "mali_gralloc_formats.h"
 #include "mali_gralloc_usages.h"
 
+static int map_flex_formats(uint64_t req_format)
+{
+	/* Map Android flexible formats to internal base formats */
+	if (req_format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED || req_format == HAL_PIXEL_FORMAT_YCbCr_420_888)
+	{
+		req_format = MALI_GRALLOC_FORMAT_INTERNAL_NV12;
+	}
+	else if (req_format == HAL_PIXEL_FORMAT_YCbCr_422_888)
+	{
+		/* To be determined */
+	}
+	else if (req_format == HAL_PIXEL_FORMAT_YCbCr_444_888)
+	{
+		/* To be determined */
+	}
+
+	return req_format;
+}
+
 uint64_t mali_gralloc_select_format(uint64_t req_format, mali_gralloc_format_type type, uint64_t usage, int buffer_size)
 {
+    uint64_t internal_format;
     GRALLOC_UNUSED(type);
     GRALLOC_UNUSED(usage);
     GRALLOC_UNUSED(buffer_size);
 
-    if ( req_format == HAL_PIXEL_FORMAT_YCrCb_NV12_10
+    if ( req_format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED )
+    {
+        if ( GRALLOC_USAGE_HW_VIDEO_ENCODER == (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) )
+        {
+            I("(usage & GRALLOC_USAGE_HW_VIDEO_ENCODER treat as NV12");
+            internal_format = HAL_PIXEL_FORMAT_YCrCb_NV12;
+        }
+        else
+        {
+            I("treat as NV12 888");
+            internal_format = HAL_PIXEL_FORMAT_RGBX_8888;
+        }
+    }
+    else if ( req_format == HAL_PIXEL_FORMAT_YCrCb_NV12_10
         && USAGE_CONTAIN_VALUE(GRALLOC_USAGE_TO_USE_ARM_P010, GRALLOC_USAGE_ROT_MASK) )
     {
-        ALOGV("rk_debug force  MALI_GRALLOC_FORMAT_INTERNAL_P010 usage=0x%x",usage);
-        return MALI_GRALLOC_FORMAT_INTERNAL_P010; // base_format of internal_format, no modifiers.
+        ALOGV("rk_debug force  MALI_GRALLOC_FORMAT_INTERNAL_P010 usage=0x%" PRIu64, usage);
+        internal_format = MALI_GRALLOC_FORMAT_INTERNAL_P010; // base_format of internal_format, no modifiers.
     }
     else
     {
-        return (uint64_t) req_format;
+        internal_format = map_flex_formats(req_format);
     }
+
+    return internal_format;
 }
 

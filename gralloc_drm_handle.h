@@ -205,7 +205,7 @@ static inline struct gralloc_drm_handle_t *gralloc_drm_handle(buffer_handle_t _h
 				GRALLOC_DRM_HANDLE_MAGIC);
 		handle = NULL;
 	}
-
+	pthread_mutex_unlock(&handle_mutex);
 	return handle;
 }
 
@@ -246,6 +246,7 @@ static inline void gralloc_drm_unlock_handle(buffer_handle_t _handle)
 {
 	struct gralloc_drm_handle_t *handle = (struct gralloc_drm_handle_t *) _handle;
 
+	pthread_mutex_lock(&handle_mutex);
 	if(handle)
 	{
 		handle->ref--;

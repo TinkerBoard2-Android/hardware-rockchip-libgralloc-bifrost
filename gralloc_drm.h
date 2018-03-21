@@ -69,6 +69,7 @@ static inline int gralloc_drm_get_bpp(int format)
 #if RK_DRM_GRALLOC
 	case HAL_PIXEL_FORMAT_YCrCb_NV12_10:
 #endif
+	case HAL_PIXEL_FORMAT_BLOB:
 		bpp = 1;
 		break;
 	default:

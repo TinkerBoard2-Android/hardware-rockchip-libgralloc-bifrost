@@ -270,6 +270,7 @@ static struct gralloc_drm_handle_t *create_bo_handle(int width,
 	handle->format = format;
 	handle->usage = usage;
 	handle->prime_fd = -1;
+	handle->layer_count = 1;
 
 #if RK_DRM_GRALLOC
 #ifdef USE_HWC2

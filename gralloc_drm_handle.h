@@ -109,6 +109,19 @@ struct gralloc_drm_handle_t
         int        ref;
         int        pixel_stride;
         
+	/*
+	 * Multi-layer buffers.
+	 *
+	 * Gralloc 1.0 supports multiple image layers within the same
+	 * buffer allocation, where GRALLOC1_CAPABILITY_LAYERED_BUFFERS is enabled.
+	 * 'layer_count' defines the number of layers that have been allocated.
+	 * All layers are the same size (in bytes) and 'size' defines the
+	 * number of bytes in the whole allocation.
+	 * Size of each layer = 'size' / 'layer_count'.
+	 * Offset to nth layer = n * ('size' / 'layer_count'),
+	 * where n=0 for the first layer.
+	 */
+	uint32_t layer_count;
 
         union {
                 off_t    offset;

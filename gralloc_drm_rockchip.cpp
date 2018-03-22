@@ -1054,6 +1054,9 @@ static void init_afbc(uint8_t *buf, uint64_t internal_format, int w, int h)
 	switch (base_format)
 	{
 	case MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888:
+		/* Note that AFBC isn't supported for RGBX_8888 but the display drivers will treat it as RGBA8888
+		 * as a workaround for not supporting partial pre-fetch. However this format will be less
+		 * efficient for GPU. */
 	case MALI_GRALLOC_FORMAT_INTERNAL_RGBX_8888:
 	case MALI_GRALLOC_FORMAT_INTERNAL_RGB_888:
 	case MALI_GRALLOC_FORMAT_INTERNAL_RGB_565:
@@ -1600,6 +1603,9 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
         case HAL_PIXEL_FORMAT_RGBA_8888:
         case HAL_PIXEL_FORMAT_RGBX_8888:
         case HAL_PIXEL_FORMAT_BGRA_8888:
+#if PLATFORM_SDK_VERSION >= 26
+        case HAL_PIXEL_FORMAT_RGBA_1010102:
+#endif
             get_rgb_stride_and_size(w, h, 4, &pixel_stride,
                     &byte_stride, &size, alloc_type);
             break;
@@ -1613,6 +1619,13 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
             get_rgb_stride_and_size(w, h, 2, &pixel_stride,
                     &byte_stride, &size, alloc_type);
             break;
+
+#if PLATFORM_SDK_VERSION >= 26
+        case HAL_PIXEL_FORMAT_RGBA_FP16:
+            get_rgb_stride_and_size(w, h, 8, &pixel_stride,
+                                    &byte_stride, &size, alloc_type);
+            break;
+#endif
 
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
         case MALI_GRALLOC_FORMAT_INTERNAL_YV12:

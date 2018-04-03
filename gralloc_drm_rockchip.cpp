@@ -2189,8 +2189,12 @@ static int drm_gem_rockchip_map(struct gralloc_drm_drv_t *drv,
 	else
 	{
 		*addr = rockchip_bo_map(buf->bo);
-		if (!*addr) {
-			ALOGE("failed to map bo\n");
+		if ( !*addr || (*addr == MAP_FAILED) ) {
+			ALOGE("failed to map bo,*addr=%p, bo=%p, w : %d, h : %d, format : 0x%x, usage : 0x%x, size=%d,pixel_stride=%d,byte_stride=%d prime_fd=%d,share_attr_fd=%d",
+				*addr, buf->bo, gr_handle->width, gr_handle->height, gr_handle->format, gr_handle->usage, gr_handle->size,
+				gr_handle->pixel_stride,gr_handle->byte_stride,gr_handle->prime_fd,gr_handle->share_attr_fd);
+			if(*addr == MAP_FAILED)
+				*addr = NULL;
 			ret = -1;
 		}
 #if RK_CTS_WORKROUND

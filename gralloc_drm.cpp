@@ -323,6 +323,8 @@ struct gralloc_drm_bo_t *gralloc_drm_bo_create(struct gralloc_drm_t *drm,
     handle->producer_usage = usage;
 	handle->ref = 0;
 
+    handle->format = (int)(handle->internal_format); // 'internal_format' 并未使用 ARM 的高位扩展标识.
+
 	return bo;
 }
 

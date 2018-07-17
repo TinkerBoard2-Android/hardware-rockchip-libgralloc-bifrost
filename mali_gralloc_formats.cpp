@@ -67,12 +67,12 @@ uint64_t mali_gralloc_select_format(uint64_t req_format, mali_gralloc_format_typ
     {
         if ( GRALLOC_USAGE_HW_VIDEO_ENCODER == (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) )
         {
-            I("(usage & GRALLOC_USAGE_HW_VIDEO_ENCODER treat as NV12");
+            I("select NV12 for HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED with GRALLOC_USAGE_HW_VIDEO_ENCODER.");
             internal_format = HAL_PIXEL_FORMAT_YCrCb_NV12;
         }
         else
         {
-            I("treat as NV12 888");
+            I("select RGBX_8888 for HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED without GRALLOC_USAGE_HW_VIDEO_ENCODER.");
             internal_format = HAL_PIXEL_FORMAT_RGBX_8888;
         }
     }

@@ -84,12 +84,19 @@ LOCAL_MODULE := libgralloc_drm
 LOCAL_PROPRIETARY_MODULE := true
 LOCAL_MODULE_TAGS := optional
 
-LOCAL_SRC_FILES := \
-	gralloc_drm.cpp
-
 LOCAL_C_INCLUDES := \
 	external/libdrm \
-	external/libdrm/include/drm
+	external/libdrm/include/drm \
+
+LOCAL_HEADER_LIBRARIES += \
+	libhardware_headers \
+	liblog_headers \
+	libutils_headers \
+	libcutils_headers
+
+LOCAL_CPPFLAGS := -Wunused-variable
+LOCAL_SRC_FILES := \
+	gralloc_drm.cpp
 
 LOCAL_SHARED_LIBRARIES := \
 	libdrm \
@@ -173,7 +180,9 @@ MALI_AFBC_GRALLOC := 0
 AFBC_FILES =
 endif
 
-LOCAL_C_INCLUDES += hardware/rockchip/librkvpu
+LOCAL_C_INCLUDES += \
+	hardware/rockchip/librkvpu \
+
 LOCAL_SRC_FILES += gralloc_drm_rockchip.cpp \
 	mali_gralloc_formats.cpp \
 	$(AFBC_FILES)
@@ -245,10 +254,16 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES := \
 	gralloc.cpp
 
-
+LOCAL_CPPFLAGS := -Wunused-variable
 LOCAL_C_INCLUDES := \
 	external/libdrm \
 	external/libdrm/include/drm
+
+LOCAL_HEADER_LIBRARIES += \
+	libutils_headers \
+	liblog_headers \
+	libhardware_headers \
+	libcutils_headers
 
 LOCAL_SHARED_LIBRARIES := \
 	libgralloc_drm \

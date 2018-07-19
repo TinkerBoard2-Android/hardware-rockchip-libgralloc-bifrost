@@ -113,7 +113,6 @@ struct gralloc_drm_t *gralloc_drm_create(void)
 {
 	char path[PROPERTY_VALUE_MAX];
 	struct gralloc_drm_t *drm;
-	int err;
 
 	drm = new gralloc_drm_t;
 	if (!drm)

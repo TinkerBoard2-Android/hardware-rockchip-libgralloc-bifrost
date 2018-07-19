@@ -31,6 +31,8 @@
 #include <system/graphics.h>
 #include <hardware/gralloc.h>
 
+#include <errno.h>
+
 #include "rk_drm_gralloc_config.h"
 #include "mali_gralloc_usages.h"
 #include "mali_gralloc_formats.h"

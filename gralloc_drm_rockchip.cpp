@@ -1505,7 +1505,6 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 	size_t size;
 	uint32_t gem_handle;
 	AllocType alloc_type = UNCOMPRESSED;
-	bool alloc_for_extended_yuv = false, alloc_for_arm_afbc_yuv = false;
 	int internalWidth,internalHeight;
 	uint64_t internal_format;
         int byte_stride;   // Stride of the buffer in bytes
@@ -2203,7 +2202,12 @@ static int drm_gem_rockchip_map(struct gralloc_drm_drv_t *drv,
 	struct dma_buf_sync sync_args;
 	int ret = 0, ret2 = 0;
 
-	UNUSED(drv, x, y, w, h, enable_write);
+	UNUSED(drv);
+	UNUSED(x);
+	UNUSED(y);
+	UNUSED(w);
+	UNUSED(h);
+	UNUSED(enable_write);
 
 	if (gr_handle->usage & GRALLOC_USAGE_PROTECTED)
 	{
@@ -2233,7 +2237,6 @@ static int drm_gem_rockchip_map(struct gralloc_drm_drv_t *drv,
 			{
 				FindAppHintInFile(VIEW_CTS_FILE, VIEW_CTS_PROG_NAME, BIG_SCALE_HINT, &big_scale, IMG_INT_TYPE);
 				if(big_scale && (gr_handle->usage == 0x603 || gr_handle->usage == 0x203) ) {
-					char* pAddr = (char*)(*addr);
 					memset(*addr,0xFF,gr_handle->height*gr_handle->byte_stride);
 					ALOGD_IF(1, "memset 0xff byte_stride=%d iCnt=%d",gr_handle->byte_stride,iCnt);
 					iCnt++;
@@ -2300,7 +2303,6 @@ static int drm_init_version()
 struct gralloc_drm_drv_t *gralloc_drm_drv_create_for_rockchip(int fd)
 {
 	struct rockchip_info *info;
-	int ret;
 
 #if RK_DRM_GRALLOC
         drm_init_version();

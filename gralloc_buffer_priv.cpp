@@ -74,7 +74,6 @@ int gralloc_buffer_attr_allocate(struct gralloc_drm_handle_t *hnd)
 		 * The reason for this is because we can set a value less than 0 for
 		 * not-initialized values.
 		 */
-		attr_region *region = (attr_region *)hnd->attr_base;
 
 		memset(hnd->attr_base, 0xff, PAGE_SIZE);
 		munmap(hnd->attr_base, PAGE_SIZE);

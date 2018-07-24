@@ -17,7 +17,7 @@
  */
 
 #include <cutils/ashmem.h>
-#include <cutils/log.h>
+#include <log/log.h>
 #include <sys/mman.h>
 
 #include "rk_drm_gralloc_config.h"

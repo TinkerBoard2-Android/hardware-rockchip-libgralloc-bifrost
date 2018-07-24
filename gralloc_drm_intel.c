@@ -29,7 +29,7 @@
 
 #define LOG_TAG "GRALLOC-I915"
 
-#include <cutils/log.h>
+#include <log/log.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <assert.h>

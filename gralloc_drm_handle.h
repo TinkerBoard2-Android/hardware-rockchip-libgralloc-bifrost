@@ -32,6 +32,7 @@
 #include <hardware/gralloc.h>
 
 #include <errno.h>
+#include <pthread.h>
 
 #include "rk_drm_gralloc_config.h"
 #include "mali_gralloc_usages.h"

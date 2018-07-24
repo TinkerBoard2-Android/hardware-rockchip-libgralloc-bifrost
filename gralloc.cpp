@@ -23,7 +23,7 @@
 
 #define LOG_TAG "GRALLOC-MOD"
 
-#include <cutils/log.h>
+#include <log/log.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <pthread.h>

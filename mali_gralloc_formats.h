@@ -20,7 +20,7 @@
 #define MALI_GRALLOC_FORMATS_H_
 
 #include <system/graphics.h>
-#include <cutils/log.h>
+#include <log/log.h>
 
 /* Internal formats are represented in gralloc as a 64bit identifier
  * where the 32 lower bits are a base format and the 32 upper bits are modifiers.

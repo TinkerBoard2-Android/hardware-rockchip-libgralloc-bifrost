@@ -1485,7 +1485,7 @@ static bool should_disable_afbc_in_fb_target_layer()
 {
     char value[PROPERTY_VALUE_MAX];
 
-    property_get("sys.gralloc.disable_afbc", value, "0");
+    property_get("vendor.gralloc.disable_afbc", value, "0");
 
     return (0 == strcmp("1", value) );
 }
@@ -1539,7 +1539,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
                                                  w * h);
 
 #if USE_AFBC_LAYER
-	property_get("persist.sys.framebuffer.main", framebuffer_size, "0x0@60");
+	property_get("persist.vendor.framebuffer.main", framebuffer_size, "0x0@60");
 	sscanf(framebuffer_size, "%dx%d@%d", &width, &height, &vrefresh);
 	//Vop cann't support 4K AFBC layer.
 	if (height < 2160)
@@ -1567,7 +1567,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
                         I("use_afbc_layer: force to set 'internal_format' to 0x%" PRIu64 " for buffer_for_fb_target_layer.",
                           internal_format);
                     }
-                    property_set("sys.gmali.fbdc_target","1");
+                    property_set("vendor.gmali.fbdc_target","1");
                 }
                 else
                 {
@@ -1575,12 +1575,12 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
                     {
                         I("debug_only : not to use afbc in fb_target_layer, the original format : 0x%" PRIu64, internal_format);
                     }
-			        property_set("sys.gmali.fbdc_target","0");
+			        property_set("vendor.gmali.fbdc_target","0");
                 }
 	        }
 	        else
 	        {
-			    property_set("sys.gmali.fbdc_target","0");
+			    property_set("vendor.gmali.fbdc_target","0");
 	        }
 	    }
 	}
@@ -2287,10 +2287,10 @@ static int drm_init_version()
 {
         char value[PROPERTY_VALUE_MAX];
 
-        property_get("sys.ggralloc.version", value, "NULL");
+        property_get("vendor.ggralloc.version", value, "NULL");
         if(!strcmp(value,"NULL"))
         {
-                property_set("sys.ggralloc.version", RK_GRALLOC_VERSION);
+                property_set("vendor.ggralloc.version", RK_GRALLOC_VERSION);
                 ALOGD(RK_GRAPHICS_VER);
                 ALOGD("gralloc ver '%s' on arm_release_ver '%s'.",
                         RK_GRALLOC_VERSION,

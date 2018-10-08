@@ -79,7 +79,7 @@ uint64_t mali_gralloc_select_format(uint64_t req_format, mali_gralloc_format_typ
     else if ( req_format == HAL_PIXEL_FORMAT_YCrCb_NV12_10
         && USAGE_CONTAIN_VALUE(GRALLOC_USAGE_TO_USE_ARM_P010, GRALLOC_USAGE_ROT_MASK) )
     {
-        ALOGV("rk_debug force  MALI_GRALLOC_FORMAT_INTERNAL_P010 usage=0x%" PRIu64, usage);
+        ALOGV("rk_debug force  MALI_GRALLOC_FORMAT_INTERNAL_P010 usage=0x%" PRIx64, usage);
         internal_format = MALI_GRALLOC_FORMAT_INTERNAL_P010; // base_format of internal_format, no modifiers.
     }
     else

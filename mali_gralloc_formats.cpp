@@ -47,7 +47,8 @@ static int map_flex_formats(uint64_t req_format)
 	/* Map Android flexible formats to internal base formats */
 	if (req_format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED || req_format == HAL_PIXEL_FORMAT_YCbCr_420_888)
 	{
-		req_format = MALI_GRALLOC_FORMAT_INTERNAL_NV12;
+		I("to use HAL_PIXEL_FORMAT_YCrCb_NV12 for HAL_PIXEL_FORMAT_YCbCr_420_888.");
+		req_format = HAL_PIXEL_FORMAT_YCrCb_NV12;
 	}
 	else if (req_format == HAL_PIXEL_FORMAT_YCbCr_422_888)
 	{

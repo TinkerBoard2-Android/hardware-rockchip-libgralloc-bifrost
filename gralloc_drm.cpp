@@ -323,7 +323,12 @@ struct gralloc_drm_bo_t *gralloc_drm_bo_create(struct gralloc_drm_t *drm,
     handle->producer_usage = usage;
 	handle->ref = 0;
 
-    handle->format = (int)(handle->internal_format); // 'internal_format' 并未使用 ARM 的高位扩展标识.
+	if ( HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED == handle->format )
+	{
+		handle->format = (int)(handle->internal_format); // 'internal_format' 并未使用 ARM 的高位扩展标识.
+	}
+	// .trick : video decoder/encoder, camera 等其他某块对 HAL_PIXEL_FORMAT_YCbCr_420_888 的处理方式可能和 mali, gralloc 有差异.
+	//	    这里 在 'handle->format' 中保留 HAL_PIXEL_FORMAT_YCbCr_420_888.
 
 	return bo;
 }

@@ -45,7 +45,9 @@ int gralloc_buffer_attr_allocate(struct gralloc_drm_handle_t *hnd)
 		close(hnd->share_attr_fd);
 	}
 
-	hnd->share_attr_fd = ashmem_create_region("gralloc_shared_attr", PAGE_SIZE);
+	hnd->share_attr_fd = ashmem_create_region("gralloc_shared_attr",
+                                              PAGE_SIZE); // 直接分配一个 page, page 是 mmap 操作的最小单位.
+        // ashmem_create_region 定义在 system/core/libcutils/include/cutils/ashmem.h
 
 	if (hnd->share_attr_fd < 0)
 	{
@@ -76,6 +78,8 @@ int gralloc_buffer_attr_allocate(struct gralloc_drm_handle_t *hnd)
 		 */
 
 		memset(hnd->attr_base, 0xff, PAGE_SIZE);
+
+        /* 完成 对 buffer 的必要初始化之后, unmap. */
 		munmap(hnd->attr_base, PAGE_SIZE);
 		hnd->attr_base = MAP_FAILED;
 	}
@@ -189,9 +193,11 @@ int gralloc_rk_ashmem_allocate(struct gralloc_drm_handle_t *hnd )
 		struct rk_ashmem_t *rk_ashmem = (struct rk_ashmem_t *) hnd->ashmem_base;
 
 		memset(hnd->ashmem_base, 0x0, PAGE_SIZE);
+
 		rk_ashmem->alreadyStereo = 0;
 		rk_ashmem->displayStereo = 0;
 		strcpy(rk_ashmem->LayerName, "");
+
 		munmap( hnd->ashmem_base, PAGE_SIZE );
 		hnd->ashmem_base = MAP_FAILED;
 	}

@@ -1,3 +1,9 @@
+
+/**
+ * @file gralloc_drm_rockchip.cpp
+ *      对 rk_driver_of_gralloc_drm_device 的具体实现.
+ */
+
 #define LOG_TAG "GRALLOC-ROCKCHIP"
 
 // #define ENABLE_DEBUG_LOG
@@ -85,16 +91,31 @@ struct drm_rockchip_gem_phys {
 #define DRM_IOCTL_ROCKCHIP_GEM_GET_PHYS		DRM_IOWR(DRM_COMMAND_BASE + \
 		DRM_ROCKCHIP_GEM_GET_PHYS, struct drm_rockchip_gem_phys)
 
+/**
+ * 基于 rk_drm 的, 对 driver_of_gralloc_drm_device_t 的具体实现,
+ * 即 .DP : rk_driver_of_gralloc_drm_device_t.
+ *
+ * 除了基类子对象, 还包括 扩展的成员等.
+ */
 struct rockchip_info {
+    /* 基类子对象. */
 	struct gralloc_drm_drv_t base;
 
-	struct rockchip_device *rockchip;
+    /*
+     * rockchip drm device object, rk_drm_device_object.
+     * returned from rockchip_device_create().
+     */
+	struct rockchip_device *rockchip; // rockchip_device 定义在 external/libdrm/rockchip/rockchip_drmif.h 中.
+
 	int fd;
 };
 
+/* rockchip_gralloc_drm_buffer_object. */
 struct rockchip_buffer {
+    /* 基类子对象. */
 	struct gralloc_drm_bo_t base;
 
+    /* rk_drm_bo .*/
 	struct rockchip_bo *bo;
 };
 
@@ -1490,6 +1511,13 @@ static bool should_disable_afbc_in_fb_target_layer()
     return (0 == strcmp("1", value) );
 }
 
+/**
+ * rk_driver_of_gralloc_drm_device 中对 driver_of_gralloc_drm_device 的 alloc 方法的具体实现.
+ * 注意 :
+ *      本方法 同时实现 alloc buffer 和 import buffer 的功能,
+ *      若传入的 'handle->prime_fd' < 0, 则将执行 alloc;
+ *      若传入的 'handle->prime_fd' >= 0, 则将执行 import.
+ */
 static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		struct gralloc_drm_drv_t *drv,
 		struct gralloc_drm_handle_t *handle)
@@ -1846,6 +1874,8 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
             return NULL;
     }
 
+    /*-------------------------------------------------------*/
+
 #if (1 == MALI_ARCHITECTURE_UTGARD)
 	/* match the framebuffer format */
 	if (usage & GRALLOC_USAGE_HW_FB)
@@ -1858,6 +1888,8 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 	}
 #endif //end of MALI_ARCHITECTURE_UTGARD
 #endif //end of RK_DRM_GRALLOC
+
+    /*-------------------------------------------------------*/
 
 	buf = (struct rockchip_buffer*)calloc(1, sizeof(*buf));
 	if (!buf) {
@@ -1885,6 +1917,8 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 	pitch = ALIGN(aligned_width * cpp, 64);
 	size = aligned_height * pitch;
 
+    /*-------------------------------------------------------*/
+
 	if (handle->format == HAL_PIXEL_FORMAT_YCbCr_420_888) {
 		/*
 		 * WAR for H264 decoder requiring additional space
@@ -1908,7 +1942,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 
 	if(USAGE_CONTAIN_VALUE(GRALLOC_USAGE_TO_USE_PHY_CONT,GRALLOC_USAGE_ROT_MASK))
 	{
-		flags |= ROCKCHIP_BO_CONTIG;
+		flags |= ROCKCHIP_BO_CONTIG; // 预期要求 CMA 内存.
 		ALOGD_IF(RK_DRM_GRALLOC_DEBUG, "try to use Physically Continuous memory\n");
 	}
 
@@ -1918,8 +1952,11 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		ALOGD_IF(RK_DRM_GRALLOC_DEBUG, "try to use secure memory\n");
 	}
 
-    /* 若 buufer 实际上已经分配 (通常在另一个进程中), 则... */
+    /*-------------------------------------------------------*/
+
+    /* 若 buufer 实际上已经分配 (通常在另一个进程中), 则 将 buffer import 到 当前进程, ... */
 	if (handle->prime_fd >= 0) {
+        /* 将 prime_fd 引用的 dma_buf, import 为 当前进程的 gem_object, 得到对应的 gem_handle 的 value. */
 		ret = drmPrimeFDToHandle(info->fd, handle->prime_fd,
 			&gem_handle);
 		if (ret) {
@@ -1952,9 +1989,11 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 			return NULL;
 		}
 	}
-    else    // if (handle->prime_fd >= 0)
+    else    // if (handle->prime_fd >= 0), 即 buffer 未实际分配, 将 分配, ...
     {
-		buf->bo = rockchip_bo_create(info->rockchip, size, flags);
+		buf->bo = rockchip_bo_create(info->rockchip,
+                                     size,
+                                     flags);
 		if (!buf->bo) {
 #if RK_DRM_GRALLOC
 			AERR("failed to allocate bo %dx%dx%dx%zd\n",
@@ -1967,8 +2006,10 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		}
 
 		gem_handle = rockchip_bo_handle(buf->bo);
-		ret = drmPrimeHandleToFD(info->fd, gem_handle, 0,
-			&handle->prime_fd);
+		ret = drmPrimeHandleToFD(info->fd,
+                                 gem_handle,
+                                 0,
+                                 &handle->prime_fd);
 #if RK_DRM_GRALLOC
                 ALOGD_IF(RK_DRM_GRALLOC_DEBUG, "Got fd %d for handle %d\n", handle->prime_fd, gem_handle);
 #else
@@ -1988,7 +2029,9 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		if(USAGE_CONTAIN_VALUE(GRALLOC_USAGE_TO_USE_PHY_CONT,GRALLOC_USAGE_ROT_MASK))
 		{
 			phys_arg.handle = gem_handle;
-			ret = drmIoctl(info->fd, DRM_IOCTL_ROCKCHIP_GEM_GET_PHYS, &phys_arg);
+			ret = drmIoctl(info->fd,
+                           DRM_IOCTL_ROCKCHIP_GEM_GET_PHYS,
+                           &phys_arg);
 			if (ret)
 				ALOGE("failed to get phy address: %s\n", strerror(errno));
 			ALOGD_IF(RK_DRM_GRALLOC_DEBUG,"get phys 0x%x\n", phys_arg.phy_addr);
@@ -1999,7 +2042,8 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
         {
                 addr = rockchip_bo_map(buf->bo);
                 if (!addr) {
-                        AERR("failed to map bo\n");
+                        E("failed to map bo");
+                        // LOG_ALWAYS_FATAL("failed to map bo");
                         goto err_unref;
                 }
         }
@@ -2018,6 +2062,8 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
         }
 #endif /* GRALLOC_INIT_AFBC == 1 */
 	}   // if (handle->prime_fd >= 0)
+
+    /*-------------------------------------------------------*/
 
 #if RK_DRM_GRALLOC
 #if MALI_AFBC_GRALLOC == 1
@@ -2098,6 +2144,8 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 	}
 #endif
     
+    /*-------------------------------------------------------*/
+
     switch (usage & MALI_GRALLOC_USAGE_YUV_CONF_MASK)
     {
         case MALI_GRALLOC_USAGE_YUV_CONF_0:
@@ -2130,6 +2178,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 	{
 		handle->phy_addr = phys_arg.phy_addr;
 	}
+
         handle->stride = byte_stride;//pixel_stride;
         handle->pixel_stride = pixel_stride;
         handle->byte_stride = byte_stride;
@@ -2238,6 +2287,7 @@ static int drm_gem_rockchip_map(struct gralloc_drm_drv_t *drv,
 			{
 				FindAppHintInFile(VIEW_CTS_FILE, VIEW_CTS_PROG_NAME, BIG_SCALE_HINT, &big_scale, IMG_INT_TYPE);
 				if(big_scale && (gr_handle->usage == 0x603 || gr_handle->usage == 0x203) ) {
+                    /* 在 CPU 一侧将 buffer 中的数据设置为 case 预期的 value. */
 					memset(*addr,0xFF,gr_handle->height*gr_handle->byte_stride);
 					ALOGD_IF(1, "memset 0xff byte_stride=%d iCnt=%d",gr_handle->byte_stride,iCnt);
 					iCnt++;
@@ -2256,6 +2306,11 @@ static int drm_gem_rockchip_map(struct gralloc_drm_drv_t *drv,
 	{
 		sync_args.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_RW;
 		ret2 = ioctl(bo->handle->prime_fd, DMA_BUF_IOCTL_SYNC, &sync_args);
+            // "DMA_BUF_SYNC_START", "DMA_BUF_IOCTL_SYNC" :
+            //      安全地获取 dma_buf 的 访问,
+            //      实现和 GPU 等设备对 buffer 访问操作的互斥, 即实现 "lock" 的语义.
+            //      这里, 对应的 ("DMA_BUF_SYNC_END", "DMA_BUF_IOCTL_SYNC") 在 drm_gem_rockchip_unmap 中被调用.
+
 		if (ret2 != 0)
 			ALOGD_IF(RK_DRM_GRALLOC_DEBUG, "%s:DMA_BUF_IOCTL_SYNC start failed", __FUNCTION__);
 	}
@@ -2301,6 +2356,11 @@ static int drm_init_version()
 }
 #endif
 
+/**
+ * 创建并返回 rk_driver_of_gralloc_drm_device 实例.
+ * @param fd
+ *      fd_of_drm_dev
+ */
 struct gralloc_drm_drv_t *gralloc_drm_drv_create_for_rockchip(int fd)
 {
 	struct rockchip_info *info;
@@ -2316,6 +2376,7 @@ struct gralloc_drm_drv_t *gralloc_drm_drv_create_for_rockchip(int fd)
 	}
 
 	info->rockchip = rockchip_device_create(fd);
+        // rockchip_device_create() 实现在 libdrm_rockchip.so 中.
 	if (!info->rockchip) {
 		ALOGE("Failed to create new rockchip instance\n");
 		free(info);
@@ -2324,7 +2385,7 @@ struct gralloc_drm_drv_t *gralloc_drm_drv_create_for_rockchip(int fd)
 
 	info->fd = fd;
 	info->base.destroy = drm_gem_rockchip_destroy;
-	info->base.alloc = drm_gem_rockchip_alloc;
+	info->base.alloc = drm_gem_rockchip_alloc; // "info->base" : .type : gralloc_drm_drv_t
 	info->base.free = drm_gem_rockchip_free;
 	info->base.map = drm_gem_rockchip_map;
 	info->base.unmap = drm_gem_rockchip_unmap;

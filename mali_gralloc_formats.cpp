@@ -16,6 +16,11 @@
  * limitations under the License.
  */
 
+/**
+ * @file mali_gralloc_formats.cpp
+ *      实现 mali_gralloc_select_format, 从 arm_gralloc 中的版本精简得到.
+ */
+
 #define LOG_TAG "gralloc"
 // #define ENABLE_DEBUG_LOG
 #include <log/custom_log.h>

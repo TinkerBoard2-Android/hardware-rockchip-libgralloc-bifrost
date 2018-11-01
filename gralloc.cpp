@@ -21,6 +21,11 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+/**
+ * @file gralloc.cpp
+ * 包含对 drm_module_t(drm_gralloc_module_t) 的具体实现, 以及 对 drm_alloc_device 的具体实现.
+ */
+
 #define LOG_TAG "GRALLOC-MOD"
 
 // #define ENABLE_DEBUG_LOG
@@ -60,6 +65,7 @@ static int drm_init(struct drm_module_t *dmod)
 
 	pthread_mutex_lock(&dmod->mutex);
 	if (!dmod->drm) {
+        /* 创建 gralloc_drm_device. */
 		dmod->drm = gralloc_drm_create();
 		if (!dmod->drm)
 			err = -EINVAL;
@@ -242,6 +248,9 @@ static int drm_mod_perform(const struct gralloc_module_t *mod, int op, ...)
 	return err;
 }
 
+/**
+ * drm_gralloc_module 的 registerBuffer 方法的具体实现.
+ */
 static int drm_mod_register_buffer(const gralloc_module_t *mod,
 		buffer_handle_t handle)
 {
@@ -488,6 +497,7 @@ static int drm_mod_open_gpu0(struct drm_module_t *dmod, hw_device_t **dev)
 	if (!alloc)
 		return -EINVAL;
 
+    /* 对 drm_alloc_device (drm_gralloc_module 对 alloc_device_t 的实现) 初始化. */ // .DP : drm_alloc_device
 	alloc->common.tag = HARDWARE_DEVICE_TAG;
 	alloc->common.version = 0;
 	alloc->common.module = &dmod->base.common;

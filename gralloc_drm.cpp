@@ -21,6 +21,11 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+/**
+ * @file gralloc_drm.cpp
+ * 实现 gralloc_drm.h 定义的 gralloc_drm_device 的功能接口.
+ */
+
 #define LOG_TAG "GRALLOC-DRM"
 
 #include <log/log.h>
@@ -59,6 +64,8 @@ static int gralloc_drm_get_pid(void)
 
 /*
  * Create the driver for a DRM fd.
+ * @param fd
+ *      fd_of_drm_dev
  */
 static struct gralloc_drm_drv_t *
 init_drv_from_fd(int fd)
@@ -88,6 +95,7 @@ init_drv_from_fd(int fd)
 #endif
 #ifdef ENABLE_ROCKCHIP
 		if (!drv && !strcmp(version->name, "rockchip"))
+            /* .KP : 关联 rk_drm 对 driver_of_gralloc_drm_device_t 的实现. */
 			drv = gralloc_drm_drv_create_for_rockchip(fd);
 #endif
 #ifdef ENABLE_NOUVEAU
@@ -107,7 +115,7 @@ init_drv_from_fd(int fd)
 }
 
 /*
- * Create a DRM device object.
+ * Create a DRM device object (gralloc_drm_device).
  */
 struct gralloc_drm_t *gralloc_drm_create(void)
 {
@@ -119,7 +127,7 @@ struct gralloc_drm_t *gralloc_drm_create(void)
 		return NULL;
 
 	property_get("vendor.ggralloc.drm.device", path, "/dev/dri/renderD128");
-	drm->fd = open(path, O_RDWR);
+	drm->fd = open(path, O_RDWR); // DP : fd_of_drm_dev
 	if (drm->fd < 0) {
 		ALOGE("failed to open %s", path);
 		return NULL;
@@ -156,6 +164,16 @@ int gralloc_drm_get_fd(struct gralloc_drm_t *drm)
 
 /*
  * Validate a buffer handle and return the associated bo.
+ * 某些 case 中还完成对 buffer 的 import 操作, 见对参数 'drm' 的说明.
+ * .R : 隐式的语义, 不好.
+ *
+ * @param _handle
+ *      待 check 的 buffer
+ * @param drm
+ *      若是 NULL, 仅仅 check '_handle' 在当前进程是否是有效的.
+ *          若无效, 返回 NULL.
+ *      若非 NULL, 且当前 进程 "不是" alloc 当前 buffer 的进程, 返回 register(import) 到当前进程之后的 bo.
+ *          仅在 gralloc_drm_handle_register() 中这样使用.
  */
 static struct gralloc_drm_bo_t *validate_handle(buffer_handle_t _handle,
 		struct gralloc_drm_t *drm)
@@ -166,7 +184,7 @@ static struct gralloc_drm_bo_t *validate_handle(buffer_handle_t _handle,
 		return NULL;
 
 	/* the buffer handle is passed to a new process */
-	//ALOGD_IF(RK_DRM_GRALLOC_DEBUG,"data_owner=%d gralloc_pid=%d data=%p\n", handle->data_owner, gralloc_drm_get_pid(), handle->data);
+    // 若 当前 进程 "不是" alloc 当前 buffer 的进程, 即 "_handle" 来自 remote 进程, 则...
 	if (unlikely(handle->data_owner != gralloc_drm_pid)) {
 		struct gralloc_drm_bo_t *bo;
 
@@ -180,7 +198,10 @@ static struct gralloc_drm_bo_t *validate_handle(buffer_handle_t _handle,
 		ALOGD_IF(RK_DRM_GRALLOC_DEBUG,"handle: name=%d pfd=%d\n", handle->name,handle->prime_fd);
 		/* create the struct gralloc_drm_bo_t locally */
 		if (handle->name || handle->prime_fd >= 0)
-			bo = drm->drv->alloc(drm->drv, handle);
+        {
+            /* 通过当前的 driver_of_gralloc_drm_device_t, create the struct gralloc_drm_bo_t locally */
+			bo = drm->drv->alloc(drm->drv, handle); // .trick : "alloc" : 这里实现将完成 import 操作.
+        }
 		else /* an invalid handle */
 			bo = NULL;
 		if (bo) {
@@ -305,7 +326,7 @@ struct gralloc_drm_bo_t *gralloc_drm_bo_create(struct gralloc_drm_t *drm,
 		return NULL;
     }
 
-	bo = drm->drv->alloc(drm->drv, handle);
+	bo = drm->drv->alloc(drm->drv, handle); // "alloc" : drm_gem_rockchip_alloc(), 这里实现 allocate.
 	if (!bo) {
 		delete handle;
 		return NULL;
@@ -416,6 +437,8 @@ int gralloc_drm_free_bo_from_handle(buffer_handle_t handle)
 
 /*
  * Get the buffer handle and stride of a bo.
+ * @param stride
+ *      stride in bytes.
  */
 buffer_handle_t gralloc_drm_bo_get_handle(struct gralloc_drm_bo_t *bo, int *stride)
 {
@@ -507,6 +530,7 @@ void gralloc_drm_bo_unlock(struct gralloc_drm_bo_t *bo)
 
 #ifdef USE_HWC2
 int gralloc_drm_handle_get_rk_ashmem(buffer_handle_t _handle, struct rk_ashmem_t* rk_ashmem)
+    // "rk_ashmem_t" : 定义在 hardware/libhardware/include/hardware/gralloc.h 中
 {
 	int ret = 0;
 	struct gralloc_drm_handle_t *handle = gralloc_drm_handle(_handle);

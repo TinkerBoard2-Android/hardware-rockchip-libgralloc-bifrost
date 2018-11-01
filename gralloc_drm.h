@@ -21,6 +21,11 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+/**
+ * @file gralloc_drm.h
+ * 定义提供给 gralloc.cpp 调用的 gralloc_drm_device 的功能接口.
+ */
+
 #ifndef _GRALLOC_DRM_H_
 #define _GRALLOC_DRM_H_
 
@@ -38,11 +43,17 @@ extern "C" {
 struct gralloc_drm_t;
 struct gralloc_drm_bo_t;
 
+/**
+ * 创建一个 gralloc_drm_device 实例.
+ */
 struct gralloc_drm_t *gralloc_drm_create(void);
 void gralloc_drm_destroy(struct gralloc_drm_t *drm);
 
 int gralloc_drm_get_fd(struct gralloc_drm_t *drm);
 
+/**
+ * 获取指定 hal_pixel_format 的 bytes_per_pixel.
+ */
 static inline int gralloc_drm_get_bpp(int format)
 {
 	int bpp;

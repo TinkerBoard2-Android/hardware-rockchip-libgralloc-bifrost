@@ -49,6 +49,10 @@ typedef struct
 	mali_transfer_function eotf;
 } mali_hdr_info;
 
+/**
+ * .DP : gralloc_buffer_attr_t,
+ *       对 gralloc_buffer attrib 实例的标识.
+ */
 enum
 {
 	/* CROP_RECT and YUV_TRANS are intended to be

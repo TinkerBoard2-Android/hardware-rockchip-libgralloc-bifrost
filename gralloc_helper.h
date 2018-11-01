@@ -16,6 +16,10 @@
  * limitations under the License.
  */
 
+/*
+ * 定义 log 宏 和 简单的 helper function.
+ */
+
 #ifndef GRALLOC_HELPER_H_
 #define GRALLOC_HELPER_H_
 

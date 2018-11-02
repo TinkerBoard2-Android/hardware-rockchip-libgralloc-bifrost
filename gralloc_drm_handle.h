@@ -184,6 +184,7 @@ struct gralloc_drm_handle_t {
 	uint32_t reserve1;
 	uint32_t reserve2;
 
+    /* 表征 'this' 在当前进程中的 buffer_object. */
 	struct gralloc_drm_bo_t *data; /* pointer to struct gralloc_drm_bo_t */
 
 	// FIXME: the attributes below should be out-of-line

@@ -35,6 +35,11 @@ extern "C" {
 #include <stdbool.h>
 #include <sys/stat.h>
 
+#include <utils/KeyedVector.h>
+#include <utils/Mutex.h>
+
+/*---------------------------------------------------------------------------*/
+
 #define RK_CTS_WORKROUND	(1)
 
 #define UNUSED(...) (void)(__VA_ARGS__)
@@ -91,6 +96,46 @@ struct drm_rockchip_gem_phys {
 #define DRM_IOCTL_ROCKCHIP_GEM_GET_PHYS		DRM_IOWR(DRM_COMMAND_BASE + \
 		DRM_ROCKCHIP_GEM_GET_PHYS, struct drm_rockchip_gem_phys)
 
+/*---------------------------------------------------------------------------*/
+// for rk_drm_adapter :
+
+using namespace android;
+
+/**
+ * 用于 记录当前进程中某个 gem_obj 被引用状态信息 的类型.
+ */
+class gem_obj_referenced_info_entry_t {
+
+public:
+    /* handle of current gem_obj. */
+    uint32_t m_handle;
+
+    /* 当前 gem_obj 的被引用计数. */
+	uint32_t m_ref;
+
+    /*-------------------------------------------------------*/
+
+    gem_obj_referenced_info_entry_t(uint32_t gem_handle)
+        :   m_handle(gem_handle),
+            m_ref(1) // "1" : 初始被引用计数.
+    {}
+
+    uint32_t get_ref() const
+    {
+        return m_ref;
+    }
+
+    void inc_ref()
+    {
+        m_ref++;
+    }
+
+    void dec_ref()
+    {
+        m_ref--;
+    }
+};
+
 /**
  * 基于 rk_drm 的, 对 driver_of_gralloc_drm_device_t 的具体实现,
  * 即 .DP : rk_driver_of_gralloc_drm_device_t.
@@ -107,17 +152,132 @@ struct rk_driver_of_gralloc_drm_device_t {
      */
 	struct rockchip_device *rk_drm_dev; // rockchip_device 定义在 external/libdrm/rockchip/rockchip_drmif.h 中.
 
+    /* gralloc_drm_t::fd, fd of drm device file.*/
 	int fd_of_drm_dev;
+
+    /*-------------------------------------------------------*/
+    // .DP : rk_drm_adapter :
+    // RK redmine Defect #16966 中涉及的某个和 camera HAL 相关的 case 中, 确定有可能出现如下异常 :
+    //      buffer_a 和 buffer_b 引用相同的 底层的 gem_obj 实例, 在不同的线程中, 被并发地调用 register/lock/unlock/unregister;
+    //      buffer_a 被 unregister, rockchip_bo_destroy() 将被调用,
+    //          因为 rk_drm 对 rockchip_bo 实例下的 gem_obj 未提供 被引用计数机制, 底层的 gem_obj 将被直接 close.
+    //      而之后 buffer_b 又被 lock, 此时因为底层的 gem_obj 已经被 close, 即 gem_handle 无效, lock 失败.
+    //
+    // 为处理上述的 case, 在 rk_drm_gralloc 中增加对 rockchip_bo 引用的底层的 gem_obj 被引用计数,
+    // 将对应的逻辑机构记为 rk_drm_adapter.
+
+    /**
+     * 保存当前进程中 所有有效 gem_obj 的被引用状态信息的 map.
+     * 以 gem_handle 为 key,
+     * 对应的 gem_obj_referenced_info_entry_t heap_object 的指针作为 value.
+     */
+    KeyedVector<uint32_t, gem_obj_referenced_info_entry_t*> m_gem_objs_ref_info_map;
+
+    /*
+     * 除了保护 'm_gem_objs_ref_info_map', 也保护对 rk_drm 的某一次调用.
+     * .DP : drm_lock
+     */
+    mutable Mutex m_drm_lock;
 };
+
+/**
+ * 当前 rk_driver_of_gralloc_drm_device_t 实例的指针.
+ *
+ * 按照原始的封装设计, drm_gem_rockchip_free() 等函数应该是 static 的, 并且外部传入的 'drv' 实参必须是有效的,
+ * 但是之前的开发中, 庄晓亮为 workaround 某些异常, 在本文件外部直接调用 drm_gem_rockchip_free(), 且对 'drv' 传入 NULL,
+ * 参见 commit 136daf0d.
+ * 类似的接口还有 drm_gem_rockchip_alloc().
+ * 为处理上述 case, 这里静态地保存 当前 rk_driver_of_gralloc_drm_device_t 实例的指针.
+ */
+static struct rk_driver_of_gralloc_drm_device_t* s_rk_drv;
 
 /* rockchip_gralloc_drm_buffer_object. */
 struct rockchip_buffer {
     /* 基类子对象. */
 	struct gralloc_drm_bo_t base;
 
-    /* rk_drm_bo .*/
+    /* rk_drm_bo. */
 	struct rockchip_bo *bo;
 };
+
+/*---------------------------------------------------------------------------*/
+// for rk_drm_adapter :
+//
+static inline int get_fd_of_drm_dev(const struct rk_driver_of_gralloc_drm_device_t* rk_drv)
+{
+    return rk_drv->fd_of_drm_dev;
+}
+
+static inline struct rockchip_device* get_rk_drm_dev(const struct rk_driver_of_gralloc_drm_device_t* rk_drv)
+{
+    return rk_drv->rk_drm_dev;
+}
+
+static inline KeyedVector<uint32_t, gem_obj_referenced_info_entry_t*>&
+get_gem_objs_ref_info_map(struct rk_driver_of_gralloc_drm_device_t* rk_drv)
+{
+    return rk_drv->m_gem_objs_ref_info_map;
+}
+
+static inline Mutex& get_drm_lock(struct rk_driver_of_gralloc_drm_device_t* rk_drv)
+{
+    return rk_drv->m_drm_lock;
+}
+
+/*
+ * 初始化 'rk_drv' 中的 rk_drm_adapter.
+ */
+static inline int rk_drm_adapter_init(struct rk_driver_of_gralloc_drm_device_t* rk_drv)
+{
+    int ret = 0;
+    KeyedVector<uint32_t, gem_obj_referenced_info_entry_t*>& map = get_gem_objs_ref_info_map(rk_drv);
+
+    map.setCapacity(16);
+
+    return ret;
+}
+
+static inline void rk_drm_adapter_term(struct rk_driver_of_gralloc_drm_device_t* rk_drv)
+{
+	UNUSED(rk_drv);
+}
+
+static struct rockchip_bo* rk_drm_adapter_create_rockchip_bo(struct rk_driver_of_gralloc_drm_device_t* rk_drv,
+                                                             size_t size,
+                                                             uint32_t flags);
+
+static void rk_drm_adapter_destroy_rockchip_bo(struct rk_driver_of_gralloc_drm_device_t* rk_drv,
+                                               struct rockchip_bo *bo);
+
+static struct rockchip_bo* rk_drm_adapter_import_dma_buf(struct rk_driver_of_gralloc_drm_device_t* rk_drv,
+                                                         int dma_buf_fd,
+                                                         uint32_t flags,
+                                                         uint32_t size);
+
+static inline uint32_t rk_drm_adapter_get_gem_handle(struct rockchip_bo *bo)
+{
+    return rockchip_bo_handle(bo);
+}
+
+static inline uint32_t rk_drm_adapter_get_prime_fd(struct rk_driver_of_gralloc_drm_device_t* rk_drv,
+                                                   struct rockchip_bo *bo,
+                                                   int* prime_fd);
+
+static inline void* rk_drm_adapter_map_rockchip_bo(struct rockchip_bo *bo)
+{
+    return rockchip_bo_map(bo);
+}
+
+static int rk_drm_adapter_inc_gem_obj_ref(struct rk_driver_of_gralloc_drm_device_t* rk_drv,
+                                          uint32_t handle);
+
+static void rk_drm_adapter_dec_gem_obj_ref(struct rk_driver_of_gralloc_drm_device_t* rk_drv,
+                                           uint32_t handle);
+
+static void rk_drm_adapter_close_gem_obj(struct rk_driver_of_gralloc_drm_device_t* rk_drv,
+                                         uint32_t handle);
+
+/*---------------------------------------------------------------------------*/
 
 #if RK_DRM_GRALLOC
 
@@ -1489,14 +1649,17 @@ bool ModifyAppHintInFile(const char *pszFileName, const char *pszAppName,
 }
 #endif
 
-
 static void drm_gem_rockchip_destroy(struct gralloc_drm_drv_t *drv)
 {
 	struct rk_driver_of_gralloc_drm_device_t *rk_drv = (struct rk_driver_of_gralloc_drm_device_t *)drv;
 
+    rk_drm_adapter_term(rk_drv);
+
 	if (rk_drv->rk_drm_dev)
 		rockchip_device_destroy(rk_drv->rk_drm_dev);
-	free(rk_drv);
+
+    delete rk_drv;
+    s_rk_drv = NULL;
 }
 
 static bool should_disable_afbc_in_fb_target_layer()
@@ -1521,7 +1684,6 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 {
 	struct rk_driver_of_gralloc_drm_device_t *rk_drv = (struct rk_driver_of_gralloc_drm_device_t *)drv;
 	struct rockchip_buffer *buf;
-	struct drm_gem_close args;
 #if  !RK_DRM_GRALLOC
         int ret, cpp, pitch, aligned_width, aligned_height;
         uint32_t size, gem_handle;
@@ -1549,6 +1711,11 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 	struct drm_rockchip_gem_phys phys_arg;
 
         D("enter, w : %d, h : %d, format : 0x%x, usage : 0x%x.", w, h, format, usage);
+
+    if ( NULL == rk_drv )
+    {
+        rk_drv = s_rk_drv;
+    }
 
 	phys_arg.phy_addr = 0;
 
@@ -1903,6 +2070,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 #endif
 		return NULL;
 	}
+    buf->bo = NULL;
 
     /*-------------------------------------------------------*/
 
@@ -1959,76 +2127,35 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 	}
 
     /*-------------------------------------------------------*/
+    // 完成 alloc 或 import buffer.
 
     /* 若 buufer 实际上已经分配 (通常在另一个进程中), 则 将 buffer import 到 当前进程, ... */
 	if (handle->prime_fd >= 0) {
         /* 将 prime_fd 引用的 dma_buf, import 为 当前进程的 gem_object, 得到对应的 gem_handle 的 value. */
-		ret = drmPrimeFDToHandle(rk_drv->fd_of_drm_dev , handle->prime_fd,
-			&gem_handle);
-		if (ret) {
-			char *c = NULL;
-			ALOGE("failed to convert prime fd to handle %d ret=%d",
-				handle->prime_fd, ret);
-			*c = 0;
-			goto err;
-		}
-
-#if RK_DRM_GRALLOC
-		ALOGD_IF(RK_DRM_GRALLOC_DEBUG, "Got handle %d for fd %d\n", gem_handle, handle->prime_fd);
-#else
-                ALOGV("Got handle %d for fd %d\n", gem_handle, handle->prime_fd);
-#endif
-
-		buf->bo = rockchip_bo_from_handle(rk_drv->rk_drm_dev, gem_handle,
-			flags, size);
-		if (!buf->bo) {
-#if RK_DRM_GRALLOC
-			AERR("failed to wrap bo handle=%d size=%zd\n",
-				gem_handle, size);
-#else
-                        ALOGE("failed to wrap bo handle=%d size=%d\n",
-				gem_handle, size);
-#endif
-			memset(&args, 0, sizeof(args));
-			args.handle = gem_handle;
-			drmIoctl(rk_drv->fd_of_drm_dev , DRM_IOCTL_GEM_CLOSE, &args);
-			return NULL;
+        buf->bo = rk_drm_adapter_import_dma_buf(rk_drv, handle->prime_fd, flags, size);
+		if ( NULL == buf->bo )
+        {
+			E("failed to import dma_buf, prime_fd : %d.", handle->prime_fd);
+            goto failed_to_import_dma_buf;
 		}
 	}
     else    // if (handle->prime_fd >= 0), 即 buffer 未实际分配, 将 分配, ...
     {
-		buf->bo = rockchip_bo_create(rk_drv->rk_drm_dev,
-                                     size,
-                                     flags);
-		if (!buf->bo) {
-#if RK_DRM_GRALLOC
-			AERR("failed to allocate bo %dx%dx%dx%zd\n",
+		buf->bo = rk_drm_adapter_create_rockchip_bo(rk_drv, size, flags);
+		if ( NULL == buf->bo )
+        {
+			E("failed to create(alloc) bo %dx%dx%dx%zd\n",
 				handle->height, pixel_stride,byte_stride, size);
-#else
-                        ALOGE("failed to allocate bo %dx%dx%dx%d\n",
-				handle->height, pitch, cpp, size);
-#endif
-			goto err;
+			goto failed_to_alloc_buf;
 		}
 
-		gem_handle = rockchip_bo_handle(buf->bo);
-		ret = drmPrimeHandleToFD(rk_drv->fd_of_drm_dev,
-                                 gem_handle,
-                                 0,
-                                 &handle->prime_fd);
-#if RK_DRM_GRALLOC
-                ALOGD_IF(RK_DRM_GRALLOC_DEBUG, "Got fd %d for handle %d\n", handle->prime_fd, gem_handle);
-#else
-		ALOGV("Got fd %d for handle %d\n", handle->prime_fd, gem_handle);
-#endif
-		if (ret) {
-#if RK_DRM_GRALLOC
-			AERR("failed to get prime fd %d", ret);
-#else
-                        ALOGE("failed to get prime fd %d", ret);
-#endif
-			goto err_unref;
+        ret = rk_drm_adapter_get_prime_fd(rk_drv, buf->bo, &(handle->prime_fd) );
+		if ( ret != 0 ) {
+            E("failed to get prime_fd from rockchip_bo.");
+			goto failed_to_get_prime_fd;
 		}
+
+        gem_handle = rk_drm_adapter_get_gem_handle(buf->bo);
 
 		buf->base.fb_handle = gem_handle;
 
@@ -2046,7 +2173,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 #if GRALLOC_INIT_AFBC == 1
         if (!(usage & GRALLOC_USAGE_PROTECTED))
         {
-                addr = rockchip_bo_map(buf->bo);
+                addr = rk_drm_adapter_map_rockchip_bo(buf->bo);
                 if (!addr) {
                         E("failed to map bo");
                         // LOG_ALWAYS_FATAL("failed to map bo");
@@ -2178,17 +2305,19 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
         handle->name = 0;
 	buf->base.handle = handle;
 
-        ALOGD_IF(RK_DRM_GRALLOC_DEBUG, "leave, w : %d, h : %d, format : 0x%x,internal_format : 0x%" PRIx64 ", usage : 0x%x. size=%d,pixel_stride=%d,byte_stride=%d",
+        D("leave, w : %d, h : %d, format : 0x%x,internal_format : 0x%" PRIx64 ", usage : 0x%x. size=%d,pixel_stride=%d,byte_stride=%d",
                 handle->width, handle->height, handle->format,internal_format, handle->usage, handle->size,
                 pixel_stride,byte_stride);
-        ALOGD_IF(RK_DRM_GRALLOC_DEBUG, "leave: prime_fd=%d,share_attr_fd=%d",handle->prime_fd,handle->share_attr_fd);
+        D("leave: prime_fd=%d,share_attr_fd=%d",handle->prime_fd,handle->share_attr_fd);
 
 	return &buf->base;
 
+failed_to_get_prime_fd:
 err_unref:
-	rockchip_bo_destroy(buf->bo);
+    rk_drm_adapter_destroy_rockchip_bo(rk_drv, buf->bo);
 
-err:
+failed_to_import_dma_buf:
+failed_to_alloc_buf:
 	free(buf);
 	return NULL;
 }
@@ -2197,9 +2326,13 @@ static void drm_gem_rockchip_free(struct gralloc_drm_drv_t *drv,
 		struct gralloc_drm_bo_t *bo)
 {
 	struct rockchip_buffer *buf = (struct rockchip_buffer *)bo;
-        struct gralloc_drm_handle_t *gr_handle = gralloc_drm_handle((buffer_handle_t)bo->handle);
+    struct rk_driver_of_gralloc_drm_device_t *rk_drv = (struct rk_driver_of_gralloc_drm_device_t *)drv;
+    struct gralloc_drm_handle_t *gr_handle = gralloc_drm_handle((buffer_handle_t)bo->handle);
 
-	UNUSED(drv);
+    if ( NULL == rk_drv )
+    {
+        rk_drv = s_rk_drv;
+    }
 
         if (!gr_handle)
         {
@@ -2223,8 +2356,9 @@ static void drm_gem_rockchip_free(struct gralloc_drm_drv_t *drv,
 #endif
         gralloc_drm_unlock_handle((buffer_handle_t)bo->handle);
 
-	/* TODO: Is destroy correct here? */
-	rockchip_bo_destroy(buf->bo);
+    D("rk_drv : %p", rk_drv);
+    rk_drm_adapter_destroy_rockchip_bo(rk_drv, buf->bo); // rk_drv : 0x0
+
 	free(buf);
 }
 
@@ -2251,7 +2385,7 @@ static int drm_gem_rockchip_map(struct gralloc_drm_drv_t *drv,
 	}
 	else
 	{
-		*addr = rockchip_bo_map(buf->bo);
+		*addr = rk_drm_adapter_map_rockchip_bo(buf->bo);
 		if ( !*addr || (*addr == MAP_FAILED) ) {
 			ALOGE("failed to map bo,*addr=%p, bo=%p, w : %d, h : %d, format : 0x%x, usage : 0x%x, size=%d,pixel_stride=%d,byte_stride=%d prime_fd=%d,share_attr_fd=%d",
 				*addr, buf->bo, gr_handle->width, gr_handle->height, gr_handle->format, gr_handle->usage, gr_handle->size,
@@ -2350,19 +2484,24 @@ struct gralloc_drm_drv_t *gralloc_drm_drv_create_for_rockchip(int fd)
         drm_init_version();
 #endif
 
-	rk_drv = (struct rk_driver_of_gralloc_drm_device_t*)calloc(1, sizeof(*rk_drv));
+    rk_drv = new rk_driver_of_gralloc_drm_device_t;
+        // .KP : 这里 必须用 new 的方式, 只有这样 rk_drv->m_gem_objs_ref_info_map 的构造函数才会被调用.
 	if (!rk_drv) {
 		ALOGE("Failed to allocate rockchip gralloc device\n");
 		return NULL;
 	}
+    s_rk_drv = rk_drv;
 
 	rk_drv->rk_drm_dev = rockchip_device_create(fd);
         // rockchip_device_create() 实现在 libdrm_rockchip.so 中.
 	if (!rk_drv->rk_drm_dev) {
 		ALOGE("Failed to create new rockchip_device instance\n");
-		free(rk_drv);
+        delete rk_drv;
+        s_rk_drv = NULL;
 		return NULL;
 	}
+
+    rk_drm_adapter_init(rk_drv);
 
 	rk_drv->fd_of_drm_dev = fd;
 	rk_drv->base.destroy = drm_gem_rockchip_destroy;
@@ -2372,4 +2511,221 @@ struct gralloc_drm_drv_t *gralloc_drm_drv_create_for_rockchip(int fd)
 	rk_drv->base.unmap = drm_gem_rockchip_unmap;
 
 	return &rk_drv->base;
+}
+
+/*---------------------------------------------------------------------------*/
+// rk_drm_adapter 提供给 rk_drm_gralloc 调用的接口 :
+
+/*
+ * 创建 rockchip_bo 实例, 并分配底层的 dma_buf(gem_obj).
+ */
+static struct rockchip_bo* rk_drm_adapter_create_rockchip_bo(struct rk_driver_of_gralloc_drm_device_t* rk_drv,
+                                                             size_t size,
+                                                             uint32_t flags)
+{
+    rockchip_bo* rk_bo = NULL;
+    uint32_t handle = 0;  // gem_handle
+    int ret = 0;
+
+    Mutex::Autolock _l(get_drm_lock(rk_drv) );
+
+    rk_bo = rockchip_bo_create(get_rk_drm_dev(rk_drv), size, flags);
+    if ( NULL == rk_bo )
+    {
+        SET_ERROR_AND_JUMP("fail to create rk_bo in original way.", ret, -1, EXIT);
+    }
+
+    handle = rk_drm_adapter_get_gem_handle(rk_bo);
+    D("created a gem_obj with handle %u", handle);
+    rk_drm_adapter_inc_gem_obj_ref(rk_drv, handle);
+
+EXIT:
+    if ( ret != 0 && rk_bo != NULL )
+    {
+	    rockchip_bo_destroy(rk_bo);
+        rk_bo = NULL;
+    }
+
+    return rk_bo;
+}
+
+static void rk_drm_adapter_destroy_rockchip_bo(struct rk_driver_of_gralloc_drm_device_t* rk_drv,
+                                               struct rockchip_bo *bo)
+{
+    Mutex::Autolock _l(get_drm_lock(rk_drv) );
+
+    if ( NULL == bo )
+    {
+        E("'bo' is NULL.")
+            return;
+    }
+
+    if ( bo->vaddr != NULL )
+    {
+        munmap(bo->vaddr, bo->size);
+    }
+
+    /* 将底层 gem_obj 的被引用计数减 1. */
+    rk_drm_adapter_dec_gem_obj_ref(rk_drv, bo->handle);
+
+    free(bo);
+}
+
+/*
+ * 将 'dma_buf_fd' 引用的 dma_buf, import 为 当前进程的 gem_object, 创建并返回对应的 rockchip_bo 实例.
+ */
+static struct rockchip_bo* rk_drm_adapter_import_dma_buf(struct rk_driver_of_gralloc_drm_device_t* rk_drv,
+                                                         int dma_buf_fd,
+                                                         uint32_t flags,
+                                                         uint32_t size)
+{
+    int ret = 0;
+    uint32_t handle = 0; // handle of gem_obj for dma_buf imported.
+    int fd_of_drm_dev = get_fd_of_drm_dev(rk_drv);
+    struct rockchip_bo* bo = NULL;
+
+    Mutex::Autolock _l(get_drm_lock(rk_drv) );
+
+    /* 将 dma_buf_fd 引用的 dma_buf, import 为 当前进程的 gem_object, 得到对应的 gem_handle 的 value. */
+    CHECK_FUNC_CALL( drmPrimeFDToHandle(fd_of_drm_dev,
+                                        dma_buf_fd,
+                                        &handle)
+                    , ret, failed_to_import_dma_buf);
+    rk_drm_adapter_inc_gem_obj_ref(rk_drv, handle); // 预期永不失败.
+    D("imported a dma_buf as a gem_obj with handle %u", handle);
+
+	bo = rockchip_bo_from_handle(get_rk_drm_dev(rk_drv), handle, flags, size);
+    if ( NULL == bo )
+    {
+        SET_ERROR_AND_JUMP("fail to create rockchip_bo instance from gem_handle : %d", ret, -1, failed_to_create_bo, handle);
+    }
+    handle = 0;
+
+    return bo;
+
+failed_to_create_bo:
+    rk_drm_adapter_dec_gem_obj_ref(rk_drv, handle);
+failed_to_import_dma_buf:
+    return NULL;
+}
+
+/*
+ * 获取 '*bo' 的底层 gem_obj 的 prime_fd, 即其对应的 dma_buf 的 fd (dma_buf_fd).
+ * '*prime_fd' 并 "不" 持有对 gem_obj 的 引用计数.
+ */
+static inline uint32_t rk_drm_adapter_get_prime_fd(struct rk_driver_of_gralloc_drm_device_t* rk_drv,
+                                                   struct rockchip_bo *bo,
+                                                   int* prime_fd)
+{
+    int fd_of_drm_dev = get_fd_of_drm_dev(rk_drv);
+	uint32_t gem_handle = rk_drm_adapter_get_gem_handle(bo);
+
+    Mutex::Autolock _l(get_drm_lock(rk_drv) );
+
+    return drmPrimeHandleToFD(fd_of_drm_dev,
+                              gem_handle,
+                              0,
+                              prime_fd);
+}
+
+/*-------------------------------------------------------*/
+// 在 rk_drm_adapter 内部使用的函数 :
+
+/*
+ * 在 s_gem_objs_ref_info_map 中增加 指定 gem_obj 的被引用计数.
+ * 若对应的 gem_obj_referenced_info_entry_t 实例不存在,
+ * 则创建, 并添加到 s_gem_objs_ref_info_map 中.
+ * 调用者必须持有 'rk_drm->m_drm_lock'.
+ *
+ * @param handle
+ *      目标 gem_obj 的 handle.
+ */
+static int rk_drm_adapter_inc_gem_obj_ref(struct rk_driver_of_gralloc_drm_device_t* rk_drv,
+                                          uint32_t handle)
+{
+    int ret = 0;
+
+    KeyedVector<uint32_t, gem_obj_referenced_info_entry_t*>& map = get_gem_objs_ref_info_map(rk_drv);
+
+    /* 若当前 gem_obj "尚未" 被记录, 则.... */
+    if ( map.indexOfKey(handle) < 0 )
+    {
+        gem_obj_referenced_info_entry_t* entry = new gem_obj_referenced_info_entry_t(handle); // info_entry.
+        map.add(handle, entry);
+        entry = NULL;    // '*entry' 实例将由 'map' 维护.
+    }
+    /* 否则, 即 "已经" 被记录, 则... */
+    else
+    {
+        gem_obj_referenced_info_entry_t*& entry = map.editValueFor(handle);
+        entry->inc_ref();
+    }
+
+    return ret;
+}
+
+/*
+ * 在 s_gem_objs_ref_info_map 中, 减少指定 gem_obj 的被引用计数.
+ * 若减少到 0, remove 对应的 gem_obj_referenced_info_entry_t 实例,
+ * 并调用 rk_drm_adapter_close_gem_obj(), close 该 gem_obj.
+ * 调用者必须持有 'rk_drm->m_drm_lock'.
+ *
+ * @param handle
+ *      目标 gem_obj 的 handle.
+ */
+static void rk_drm_adapter_dec_gem_obj_ref(struct rk_driver_of_gralloc_drm_device_t* rk_drv,
+                                           uint32_t handle)
+{
+    KeyedVector<uint32_t, gem_obj_referenced_info_entry_t*>& map = get_gem_objs_ref_info_map(rk_drv);
+
+    /* 若当前 gem_obj "尚未" 被记录, 则.... */
+    if ( map.indexOfKey(handle) < 0 )
+    {
+        W("no info entry for gem_handle(%u)", handle);
+        return;
+    }
+    /* 否则, 即 "已经" 被记录, 则... */
+    else
+    {
+        gem_obj_referenced_info_entry_t*& entry = map.editValueFor(handle);
+
+        entry->dec_ref();
+
+        if ( 0 == entry->get_ref() )
+        {
+            /* 先释放 目标 value 指向的 heap 中的 info_entry 实例. */
+            delete map.valueFor(handle);
+            /* 将 entry(的指针) 从 'map' 中移除. */
+		    map.removeItem(handle);
+
+            rk_drm_adapter_close_gem_obj(rk_drv, handle);
+        }
+
+        return;
+    }
+}
+
+/*
+ * 关闭 'handle' 指定的 gem_obj.
+ * 调用者必须持有 'rk_drm->m_drm_lock'.
+ *
+ * @param handle
+ *      目标 gem_obj 的 handle.
+ */
+static void rk_drm_adapter_close_gem_obj(struct rk_driver_of_gralloc_drm_device_t* rk_drv,
+                                         uint32_t handle)
+{
+    struct drm_gem_close args;
+    int ret;
+    int fd_of_drm_dev = get_fd_of_drm_dev(rk_drv);
+
+    memset(&args, 0, sizeof(args) );
+    args.handle = handle;
+
+    D("to close a gem_obj with handle %u", handle);
+    ret = drmIoctl(fd_of_drm_dev, DRM_IOCTL_GEM_CLOSE, &args);
+    if ( 0 != ret )
+    {
+        E("fail to perform DRM_IOCTL_GEM_CLOSE, ret : %d, err : %s.", ret, strerror(errno) );
+    }
 }

@@ -1,7 +1,7 @@
 
 /**
  * @file gralloc_drm_rockchip.cpp
- *      对 rk_driver_of_gralloc_drm_device 的具体实现.
+ *      对 rk_driver_of_gralloc_drm_device_t 的具体实现.
  */
 
 #define LOG_TAG "GRALLOC-ROCKCHIP"
@@ -97,17 +97,17 @@ struct drm_rockchip_gem_phys {
  *
  * 除了基类子对象, 还包括 扩展的成员等.
  */
-struct rockchip_info {
+struct rk_driver_of_gralloc_drm_device_t {
     /* 基类子对象. */
 	struct gralloc_drm_drv_t base;
 
     /*
-     * rockchip drm device object, rk_drm_device_object.
+     * rockchip drm device object, rk_drm_device_object or rk_drm_dev
      * returned from rockchip_device_create().
      */
-	struct rockchip_device *rockchip; // rockchip_device 定义在 external/libdrm/rockchip/rockchip_drmif.h 中.
+	struct rockchip_device *rk_drm_dev; // rockchip_device 定义在 external/libdrm/rockchip/rockchip_drmif.h 中.
 
-	int fd;
+	int fd_of_drm_dev;
 };
 
 /* rockchip_gralloc_drm_buffer_object. */
@@ -1495,11 +1495,11 @@ bool ModifyAppHintInFile(const char *pszFileName, const char *pszAppName,
 
 static void drm_gem_rockchip_destroy(struct gralloc_drm_drv_t *drv)
 {
-	struct rockchip_info *info = (struct rockchip_info *)drv;
+	struct rk_driver_of_gralloc_drm_device_t *rk_drv = (struct rk_driver_of_gralloc_drm_device_t *)drv;
 
-	if (info->rockchip)
-		rockchip_device_destroy(info->rockchip);
-	free(info);
+	if (rk_drv->rk_drm_dev)
+		rockchip_device_destroy(rk_drv->rk_drm_dev);
+	free(rk_drv);
 }
 
 static bool should_disable_afbc_in_fb_target_layer()
@@ -1522,7 +1522,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		struct gralloc_drm_drv_t *drv,
 		struct gralloc_drm_handle_t *handle)
 {
-	struct rockchip_info *info = (struct rockchip_info *)drv;
+	struct rk_driver_of_gralloc_drm_device_t *rk_drv = (struct rk_driver_of_gralloc_drm_device_t *)drv;
 	struct rockchip_buffer *buf;
 	struct drm_gem_close args;
 #if  !RK_DRM_GRALLOC
@@ -1957,7 +1957,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
     /* 若 buufer 实际上已经分配 (通常在另一个进程中), 则 将 buffer import 到 当前进程, ... */
 	if (handle->prime_fd >= 0) {
         /* 将 prime_fd 引用的 dma_buf, import 为 当前进程的 gem_object, 得到对应的 gem_handle 的 value. */
-		ret = drmPrimeFDToHandle(info->fd, handle->prime_fd,
+		ret = drmPrimeFDToHandle(rk_drv->fd_of_drm_dev , handle->prime_fd,
 			&gem_handle);
 		if (ret) {
 			char *c = NULL;
@@ -1973,7 +1973,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
                 ALOGV("Got handle %d for fd %d\n", gem_handle, handle->prime_fd);
 #endif
 
-		buf->bo = rockchip_bo_from_handle(info->rockchip, gem_handle,
+		buf->bo = rockchip_bo_from_handle(rk_drv->rk_drm_dev, gem_handle,
 			flags, size);
 		if (!buf->bo) {
 #if RK_DRM_GRALLOC
@@ -1985,13 +1985,13 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 #endif
 			memset(&args, 0, sizeof(args));
 			args.handle = gem_handle;
-			drmIoctl(info->fd, DRM_IOCTL_GEM_CLOSE, &args);
+			drmIoctl(rk_drv->fd_of_drm_dev , DRM_IOCTL_GEM_CLOSE, &args);
 			return NULL;
 		}
 	}
     else    // if (handle->prime_fd >= 0), 即 buffer 未实际分配, 将 分配, ...
     {
-		buf->bo = rockchip_bo_create(info->rockchip,
+		buf->bo = rockchip_bo_create(rk_drv->rk_drm_dev,
                                      size,
                                      flags);
 		if (!buf->bo) {
@@ -2006,7 +2006,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		}
 
 		gem_handle = rockchip_bo_handle(buf->bo);
-		ret = drmPrimeHandleToFD(info->fd,
+		ret = drmPrimeHandleToFD(rk_drv->fd_of_drm_dev,
                                  gem_handle,
                                  0,
                                  &handle->prime_fd);
@@ -2029,7 +2029,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		if(USAGE_CONTAIN_VALUE(GRALLOC_USAGE_TO_USE_PHY_CONT,GRALLOC_USAGE_ROT_MASK))
 		{
 			phys_arg.handle = gem_handle;
-			ret = drmIoctl(info->fd,
+			ret = drmIoctl(rk_drv->fd_of_drm_dev,
                            DRM_IOCTL_ROCKCHIP_GEM_GET_PHYS,
                            &phys_arg);
 			if (ret)
@@ -2363,32 +2363,32 @@ static int drm_init_version()
  */
 struct gralloc_drm_drv_t *gralloc_drm_drv_create_for_rockchip(int fd)
 {
-	struct rockchip_info *info;
+	struct rk_driver_of_gralloc_drm_device_t *rk_drv;
 
 #if RK_DRM_GRALLOC
         drm_init_version();
 #endif
 
-	info = (struct rockchip_info*)calloc(1, sizeof(*info));
-	if (!info) {
+	rk_drv = (struct rk_driver_of_gralloc_drm_device_t*)calloc(1, sizeof(*rk_drv));
+	if (!rk_drv) {
 		ALOGE("Failed to allocate rockchip gralloc device\n");
 		return NULL;
 	}
 
-	info->rockchip = rockchip_device_create(fd);
+	rk_drv->rk_drm_dev = rockchip_device_create(fd);
         // rockchip_device_create() 实现在 libdrm_rockchip.so 中.
-	if (!info->rockchip) {
-		ALOGE("Failed to create new rockchip instance\n");
-		free(info);
+	if (!rk_drv->rk_drm_dev) {
+		ALOGE("Failed to create new rockchip_device instance\n");
+		free(rk_drv);
 		return NULL;
 	}
 
-	info->fd = fd;
-	info->base.destroy = drm_gem_rockchip_destroy;
-	info->base.alloc = drm_gem_rockchip_alloc; // "info->base" : .type : gralloc_drm_drv_t
-	info->base.free = drm_gem_rockchip_free;
-	info->base.map = drm_gem_rockchip_map;
-	info->base.unmap = drm_gem_rockchip_unmap;
+	rk_drv->fd_of_drm_dev = fd;
+	rk_drv->base.destroy = drm_gem_rockchip_destroy;
+	rk_drv->base.alloc = drm_gem_rockchip_alloc; // "rk_drv->base" : .type : gralloc_drm_drv_t
+	rk_drv->base.free = drm_gem_rockchip_free;
+	rk_drv->base.map = drm_gem_rockchip_map;
+	rk_drv->base.unmap = drm_gem_rockchip_unmap;
 
-	return &info->base;
+	return &rk_drv->base;
 }

@@ -121,9 +121,6 @@ struct rockchip_buffer {
 
 #if RK_DRM_GRALLOC
 
-#define RK_GRALLOC_VERSION "1.0.6"
-#define ARM_RELEASE_VER "r13p0-00rel0"
-
 #if RK_DRM_GRALLOC_DEBUG
 #ifndef AWAR
 #define AWAR(fmt, args...) __android_log_print(ANDROID_LOG_WARN, "[Gralloc-Warning]", "%s:%d " fmt,__func__,__LINE__,##args)
@@ -2333,11 +2330,7 @@ static int drm_init_version()
         property_get("vendor.ggralloc.version", value, "NULL");
         if(!strcmp(value,"NULL"))
         {
-                property_set("vendor.ggralloc.version", RK_GRALLOC_VERSION);
                 ALOGD(RK_GRAPHICS_VER);
-                ALOGD("gralloc ver '%s' on arm_release_ver '%s'.",
-                        RK_GRALLOC_VERSION,
-                        ARM_RELEASE_VER);
         }
 
         return 0;

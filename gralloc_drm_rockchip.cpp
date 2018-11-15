@@ -2145,10 +2145,10 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
         handle->name = 0;
 	buf->base.handle = handle;
 
-        ALOGD_IF(RK_DRM_GRALLOC, "leave, w : %d, h : %d, format : 0x%x,internal_format : 0x%" PRIx64 ", usage : 0x%x. size=%d,pixel_stride=%d,byte_stride=%d",
+        ALOGD_IF(RK_DRM_GRALLOC_DEBUG, "leave, w : %d, h : %d, format : 0x%x,internal_format : 0x%" PRIx64 ", usage : 0x%x. size=%d,pixel_stride=%d,byte_stride=%d",
                 handle->width, handle->height, handle->format,internal_format, handle->usage, handle->size,
                 pixel_stride,byte_stride);
-        ALOGD_IF(RK_DRM_GRALLOC, "leave: prime_fd=%d,share_attr_fd=%d",handle->prime_fd,handle->share_attr_fd);
+        ALOGD_IF(RK_DRM_GRALLOC_DEBUG, "leave: prime_fd=%d,share_attr_fd=%d",handle->prime_fd,handle->share_attr_fd);
 
 	return &buf->base;
 

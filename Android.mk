@@ -257,6 +257,8 @@ LOCAL_SRC_FILES := \
 LOCAL_CPPFLAGS := -Wunused-variable
 LOCAL_C_INCLUDES := \
 	external/libdrm \
+	external/libdrm/include/drm \
+	hardware/libhardware/include \
 	external/libdrm/include/drm
 
 LOCAL_HEADER_LIBRARIES += \

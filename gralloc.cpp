@@ -23,7 +23,10 @@
 
 #define LOG_TAG "GRALLOC-MOD"
 
-#include <log/log.h>
+// #define ENABLE_DEBUG_LOG
+#include <log/custom_log.h>
+
+#include <cutils/log.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <pthread.h>
@@ -424,58 +427,46 @@ static int drm_mod_free_gpu0(alloc_device_t *dev, buffer_handle_t handle)
 
 static int drm_mod_alloc_gpu0(alloc_device_t *dev,
 		int w, int h, int format, int usage,
-		buffer_handle_t *handle, int *stride)
+		buffer_handle_t *handle, int *stride) // 'stride' : to return stride_in_pixel
 {
 	struct drm_module_t *dmod = (struct drm_module_t *) dev->common.module;
 	struct gralloc_drm_bo_t *bo;
-	int bpp;
+	int bpp; // bytes_per_pixel
+	int actual_format; // format used actually in the native buffer. while, 'format' : requested_format.
+	int byte_stride;
 
-#if RK_DRM_GRALLOC
-    if(format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED)
+	D("enter, w : %d, h : %d, format : 0x%x, usage : 0x%x.", w, h, format, usage);
+
+    /* workaround for "run cts -o -a armeabi-v7a --skip-all-system-status-check -m CtsNativeHardwareTestCases" */
+    if (format == 0x3)
     {
-        if( (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER)
-            || (usage & GRALLOC_USAGE_HW_CAMERA_WRITE) )
+        if ( (w <= 20 && h <= 20) &&
+                (usage == 0x202 || usage == 0x100 || usage == 0x300) )
         {
-            bpp = 1;    //HAL_PIXEL_FORMAT_YCrCb_NV12
-        }
-        else
-        {
-            bpp = 4;    //HAL_PIXEL_FORMAT_RGBX_8888
+            ALOGE("rk_debug workaround for CtsNativeHardwareTestCases w = %d, h = %d, usage = %x", w, h ,usage);
+            return -EINVAL;
         }
     }
-    else
-#endif
-    {
-	    bpp = gralloc_drm_get_bpp(format);
-    }
-
-	if (!bpp)
-	{
-#if RK_DRM_GRALLOC
-		ALOGE("Cann't get valid bpp for format(0x%x)", format);
-#endif
-		return -EINVAL;
-	}
-
-	/* workaround for "run cts -o -a armeabi-v7a --skip-all-system-status-check -m CtsNativeHardwareTestCases" */
-	if (format == 0x3)
-		{
-		if ( (w <= 20 && h <= 20) &&
-			(usage == 0x202 || usage == 0x100 || usage == 0x300) )
-		{
-			ALOGE("rk_debug workaround for CtsNativeHardwareTestCases w = %d, h = %d, usage = %x", w, h ,usage);
-			return -EINVAL;
-		}
-	}
 
 	bo = gralloc_drm_bo_create(dmod->drm, w, h, format, usage);
 	if (!bo)
+	{
+		E("fail to create bo.");
 		return -ENOMEM;
+	}
 
-	*handle = gralloc_drm_bo_get_handle(bo, stride);
-	//It is no need this operation since stide is already in pixels.
-	/* in pixels */
-	*stride /= bpp;
+	*handle = gralloc_drm_bo_get_handle(bo, &byte_stride);
+
+	gralloc_drm_handle_get_format(*handle, &actual_format);
+	bpp = gralloc_drm_get_bpp(actual_format);
+	if (!bpp)
+	{
+#if RK_DRM_GRALLOC
+		ALOGE("Cann't get valid bpp for format(0x%x)", actual_format);
+#endif
+		return -EINVAL;
+	}
+	*stride = byte_stride / bpp;
 
 	return 0;
 }

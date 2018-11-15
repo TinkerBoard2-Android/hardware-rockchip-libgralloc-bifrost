@@ -462,7 +462,7 @@ static int drm_mod_alloc_gpu0(alloc_device_t *dev,
 	if (!bpp)
 	{
 #if RK_DRM_GRALLOC
-		ALOGE("Cann't get valid bpp for format(0x%x)", actual_format);
+        LOG_ALWAYS_FATAL("Cann't get valid bpp for format(0x%x)", actual_format);
 #endif
 		return -EINVAL;
 	}

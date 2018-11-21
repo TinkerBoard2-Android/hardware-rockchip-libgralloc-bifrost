@@ -980,8 +980,8 @@ static bool get_camera_formats_stride_and_size(int w, int h, uint64_t format, in
 static bool get_rk_nv12_stride_and_size(int width, int height, int* pixel_stride, int* byte_stride, size_t* size)
 {
     /**
-     * .KP : from CSY : video_decoder ÒªÇóµÄ byte_stride of buffer in NV12, ÒÑ¾­Í¨¹ý width ´«Èë.
-     * ¶Ô NV12, byte_stride ¾ÍÊÇ pixel_stride, Ò²¾ÍÊÇ luma_stride.
+     * .KP : from CSY : video_decoder è¦æ±‚çš„ byte_stride of buffer in NV12, å·²ç»é€šè¿‡ width ä¼ å…¥.
+     * å¯¹ NV12, byte_stride å°±æ˜¯ pixel_stride, ä¹Ÿå°±æ˜¯ luma_stride.
      */
     int luma_stride = width;
 
@@ -992,7 +992,7 @@ static bool get_rk_nv12_stride_and_size(int width, int height, int* pixel_stride
 
     if (size != NULL)
     {
-        /* .KP : from CSY : video_decoder ÐèÒªµÄ buffer ÖÐ³ýÁË YUV Êý¾Ý»¹ÓÐÆäËû metadata, Òª¸ü¶àµÄ¿Õ¼ä. 2 * w * h Ò»¶¨¹». */
+        /* .KP : from CSY : video_decoder éœ€è¦çš„ buffer ä¸­é™¤äº† YUV æ•°æ®è¿˜æœ‰å…¶ä»– metadata, è¦æ›´å¤šçš„ç©ºé—´. 2 * w * h ä¸€å®šå¤Ÿ. */
         *size = 2 * luma_stride * height;
     }
 
@@ -1018,17 +1018,17 @@ static bool get_rk_nv12_10bit_stride_and_size (int width, int height, int* pixel
     }
 
     /**
-     * .KP : from CSY : video_decoder ÒªÇóµÄ byte_stride of buffer in NV12_10, ÒÑ¾­Í¨¹ý width ´«Èë.
-     * ¶Ô NV12_10, Ô­ÀíÉÏ, byte_stride ºÍ pixel_stride ²»Í¬.
+     * .KP : from CSY : video_decoder è¦æ±‚çš„ byte_stride of buffer in NV12_10, å·²ç»é€šè¿‡ width ä¼ å…¥.
+     * å¯¹ NV12_10, åŽŸç†ä¸Š, byte_stride å’Œ pixel_stride ä¸åŒ.
      */
     *byte_stride = width;
 
-    /* .KP : from CSY : video_decoder ÐèÒªµÄ buffer ÖÐ³ýÁË YUV Êý¾Ý»¹ÓÐÆäËû metadata, Òª¸ü¶àµÄ¿Õ¼ä. 2 * w * h Ò»¶¨¹». */
+    /* .KP : from CSY : video_decoder éœ€è¦çš„ buffer ä¸­é™¤äº† YUV æ•°æ®è¿˜æœ‰å…¶ä»– metadata, è¦æ›´å¤šçš„ç©ºé—´. 2 * w * h ä¸€å®šå¤Ÿ. */
     *size = 2 * width * height;
 
     *pixel_stride = *byte_stride;
-    // ×ÖÃæÉÏ, ÕâÊÇ´íÎóµÄ,
-    // µ«ÊÇÄ¿Ç°¶ÔÓÚ NV12_10, rk_hwc, ½« private_module_t::stride ×÷Îª byte_stride Ê¹ÓÃ.
+    // å­—é¢ä¸Š, è¿™æ˜¯é”™è¯¯çš„,
+    // ä½†æ˜¯ç›®å‰å¯¹äºŽ NV12_10, rk_hwc, å°† private_module_t::stride ä½œä¸º byte_stride ä½¿ç”¨.
 
     return true;
 }
@@ -1562,7 +1562,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
                 if ( !should_disable_afbc_in_fb_target_layer() )
                 {
                     internal_format = MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888 | MALI_GRALLOC_INTFMT_AFBC_BASIC;
-                    if ( handle->prime_fd < 0 ) // Ö»ÔÚ½«Êµ¼Ê·ÖÅä buffer µÄÊ±ºò´òÓ¡.
+                    if ( handle->prime_fd < 0 ) // åªåœ¨å°†å®žé™…åˆ†é… buffer çš„æ—¶å€™æ‰“å°.
                     {
                         I("use_afbc_layer: force to set 'internal_format' to 0x%" PRIx64 " for buffer_for_fb_target_layer.",
                           internal_format);
@@ -1918,7 +1918,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		ALOGD_IF(RK_DRM_GRALLOC_DEBUG, "try to use secure memory\n");
 	}
 
-    /* Èô buufer Êµ¼ÊÉÏÒÑ¾­·ÖÅä (Í¨³£ÔÚÁíÒ»¸ö½ø³ÌÖÐ), Ôò... */
+    /* è‹¥ buufer å®žé™…ä¸Šå·²ç»åˆ†é… (é€šå¸¸åœ¨å¦ä¸€ä¸ªè¿›ç¨‹ä¸­), åˆ™... */
 	if (handle->prime_fd >= 0) {
 		ret = drmPrimeFDToHandle(info->fd, handle->prime_fd,
 			&gem_handle);

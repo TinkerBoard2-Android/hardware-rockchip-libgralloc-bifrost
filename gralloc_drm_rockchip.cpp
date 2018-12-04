@@ -1157,14 +1157,23 @@ static bool get_camera_formats_stride_and_size(int w, int h, uint64_t format, in
 
 static bool get_rk_nv12_stride_and_size(int width, int height, int* pixel_stride, int* byte_stride, size_t* size)
 {
+    int stride_alignment = YUV_ANDROID_PLANE_ALIGN; // stride aligment value in bytes(pixels).
     /**
      * .KP : from CSY : video_decoder 要求的 byte_stride of buffer in NV12, 已经通过 width 传入.
      * 对 NV12, byte_stride 就是 pixel_stride, 也就是 luma_stride.
      */
     int luma_stride = width;
+    if ( (luma_stride % stride_alignment) != 0 )
+    {
+        W("luma_stride from width (%d) is not %d aligned! we would force align it, something might go wrong on video_decoder side.",
+          luma_stride,
+          stride_alignment);
+	    luma_stride = GRALLOC_ALIGN(luma_stride, stride_alignment);
+    }
 
     if (width % 2 != 0 || height % 2 != 0)
     {
+        E("unexpected width(%d) or height(%d).", width, height);
         return false;
     }
 

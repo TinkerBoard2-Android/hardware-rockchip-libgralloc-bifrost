@@ -1173,8 +1173,8 @@ static bool get_rk_nv12_stride_and_size(int width, int height, int* pixel_stride
 
     if (width % 2 != 0 || height % 2 != 0)
     {
-        E("unexpected width(%d) or height(%d).", width, height);
-        return false;
+        W("unexpected width(%d) or height(%d).", width, height);
+        //return false;
     }
 
     if (size != NULL)

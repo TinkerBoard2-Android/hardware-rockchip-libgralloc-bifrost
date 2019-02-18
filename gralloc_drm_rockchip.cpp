@@ -1671,6 +1671,7 @@ static void drm_gem_rockchip_destroy(struct gralloc_drm_drv_t *drv)
     s_rk_drv = NULL;
 }
 
+#if USE_AFBC_LAYER
 static bool should_disable_afbc_in_fb_target_layer()
 {
     char value[PROPERTY_VALUE_MAX];
@@ -1679,6 +1680,7 @@ static bool should_disable_afbc_in_fb_target_layer()
 
     return (0 == strcmp("1", value) );
 }
+#endif
 
 /**
  * rk_driver_of_gralloc_drm_device 中对 driver_of_gralloc_drm_device 的 alloc 方法的具体实现.

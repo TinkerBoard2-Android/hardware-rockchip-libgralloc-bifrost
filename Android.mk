@@ -87,6 +87,7 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_C_INCLUDES := \
 	external/libdrm \
 	external/libdrm/include/drm \
+	system/core/liblog/include \
 
 LOCAL_HEADER_LIBRARIES += \
 	libhardware_headers \
@@ -259,7 +260,8 @@ LOCAL_C_INCLUDES := \
 	external/libdrm \
 	external/libdrm/include/drm \
 	hardware/libhardware/include \
-	external/libdrm/include/drm
+	external/libdrm/include/drm \
+	system/core/liblog/include
 
 LOCAL_HEADER_LIBRARIES += \
 	libutils_headers \

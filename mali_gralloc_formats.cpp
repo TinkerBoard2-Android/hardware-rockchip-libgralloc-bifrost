@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2017 ARM Limited. All rights reserved.
+ * Copyright (C) 2016-2019 ARM Limited. All rights reserved.
  *
  * Copyright (C) 2008 The Android Open Source Project
  *
@@ -16,84 +16,124 @@
  * limitations under the License.
  */
 
-/**
- * @file mali_gralloc_formats.cpp
- *      实现 mali_gralloc_select_format, 从 arm_gralloc 中的版本精简得到.
+/*
+ * @file mali_gralloc_formats.cpp : 
+ *          来自 arm_gralloc, 仅保留少量内容.
  */
-
-#define LOG_TAG "gralloc"
-// #define ENABLE_DEBUG_LOG
-#include <log/custom_log.h>
 
 #include <string.h>
 #include <dlfcn.h>
 #include <inttypes.h>
 #include <log/log.h>
+#include <assert.h>
+#include <vector>
 
-#if GRALLOC_USE_GRALLOC1_API == 1
+#if GRALLOC_VERSION_MAJOR == 1
 #include <hardware/gralloc1.h>
-#else
+#elif GRALLOC_VERSION_MAJOR == 0
 #include <hardware/gralloc.h>
 #endif
 
-// #include "mali_gralloc_module.h"
-// #include "gralloc_priv.h"
+#include "mali_gralloc_bufferallocation.h"
+#include "format_info.h"
 #include "gralloc_helper.h"
-#include "mali_gralloc_formats.h"
-#include "mali_gralloc_usages.h"
 
-static int map_flex_formats(uint64_t req_format)
+#if GRALLOC_USE_LEGACY_CALCS == 1
+#include "legacy/buffer_alloc.h"
+#endif
+
+
+#if GRALLOC_USE_LEGACY_CALCS == 1
+namespace legacy
 {
-	/* Map Android flexible formats to internal base formats */
-	if (req_format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED || req_format == HAL_PIXEL_FORMAT_YCbCr_420_888)
-	{
-		I("to use HAL_PIXEL_FORMAT_YCrCb_NV12 for HAL_PIXEL_FORMAT_YCbCr_420_888.");
-		req_format = HAL_PIXEL_FORMAT_YCrCb_NV12;
-	}
-	else if (req_format == HAL_PIXEL_FORMAT_YCbCr_422_888)
-	{
-		/* To be determined */
-	}
-	else if (req_format == HAL_PIXEL_FORMAT_YCbCr_444_888)
-	{
-		/* To be determined */
-	}
 
-	return req_format;
+// 相对 arm_gralloc 中的原始版本有简化.
+void mali_gralloc_adjust_dimensions(const uint64_t internal_format,
+                                    const uint64_t usage,
+                                    const alloc_type_t type,
+                                    const uint32_t width,
+                                    const uint32_t height,
+                                    int * const internal_width,
+                                    int * const internal_height)
+{
+	/*
+	 * Default: define internal dimensions the same as public.
+	 */
+	*internal_width = width;
+	*internal_height = height;
+
+	get_afbc_alignment(*internal_width, *internal_height, type,
+	                   internal_width, internal_height);
+
+	ALOGV("%s: internal_format=0x%" PRIx64 " usage=0x%" PRIx64
+	      " width=%u, height=%u, internal_width=%d, internal_height=%d",
+	      __FUNCTION__, internal_format, usage, width, height, *internal_width, *internal_height);
 }
 
-uint64_t mali_gralloc_select_format(uint64_t req_format, mali_gralloc_format_type type, uint64_t usage, int buffer_size)
+}
+#endif /* end of legacy */
+
+
+/*
+ * Update buffer dimensions for producer/consumer constraints. This process is
+ * not valid with CPU producer/consumer since the new resolution cannot be
+ * communicated to generic clients through the public APIs. Adjustments are
+ * likely to be related to AFBC.
+ *
+ * @param alloc_format   [in]    Format (inc. modifiers) to be allocated.
+ * @param usage          [in]    Buffer usage.
+ * @param width          [inout] Buffer width (in pixels).
+ * @param height         [inout] Buffer height (in pixels).
+ *
+ * @return none.
+ *
+ * 相对 arm_gralloc 中的原始版本有简化.
+ */
+void mali_gralloc_adjust_dimensions(const uint64_t alloc_format,
+                                    const uint64_t usage,
+                                    int* const width,
+                                    int* const height)
 {
-    uint64_t internal_format;
-    GRALLOC_UNUSED(type);
-    GRALLOC_UNUSED(usage);
-    GRALLOC_UNUSED(buffer_size);
+	// if (producers & MALI_GRALLOC_PRODUCER_GPU)
+	{
+		/* Pad all AFBC allocations to multiple of GPU tile size. */
+		if (alloc_format & MALI_GRALLOC_INTFMT_AFBC_BASIC)
+		{
+			*width = GRALLOC_ALIGN(*width, 16);
+			*height = GRALLOC_ALIGN(*height, 16);
+		}
+	}
 
-    if ( req_format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED )
-    {
-        if ( GRALLOC_USAGE_HW_VIDEO_ENCODER == (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER)
-            || GRALLOC_USAGE_HW_CAMERA_WRITE == (usage & GRALLOC_USAGE_HW_CAMERA_WRITE) )
-        {
-            I("to select NV12 for HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED for usage : 0x%" PRIx64 ".", usage);
-            internal_format = HAL_PIXEL_FORMAT_YCrCb_NV12;
-        }
-        else
-        {
-            I("to select RGBX_8888 for HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED for usage : 0x%" PRIx64 ".", usage);
-            internal_format = HAL_PIXEL_FORMAT_RGBX_8888;
-        }
-    }
-    else if ( req_format == HAL_PIXEL_FORMAT_YCrCb_NV12_10
-        && USAGE_CONTAIN_VALUE(GRALLOC_USAGE_TO_USE_ARM_P010, GRALLOC_USAGE_ROT_MASK) )
-    {
-        ALOGV("rk_debug force  MALI_GRALLOC_FORMAT_INTERNAL_P010 usage=0x%" PRIx64, usage);
-        internal_format = MALI_GRALLOC_FORMAT_INTERNAL_P010; // base_format of internal_format, no modifiers.
-    }
-    else
-    {
-        internal_format = map_flex_formats(req_format);
-    }
+	ALOGV("%s: alloc_format=0x%" PRIx64 " usage=0x%" PRIx64
+	      " alloc_width=%u, alloc_height=%u",
+	      __FUNCTION__, alloc_format, usage, *width, *height);
+}
 
-    return internal_format;
+/*
+ * Determines whether a base format is subsampled YUV, where each
+ * chroma channel has fewer samples than the luma channel. The
+ * sub-sampling is always a power of 2.
+ *
+ * @param base_format   [in]    Base format (internal).
+ *
+ * @return 1, where format is subsampled YUV;
+ *         0, otherwise
+ */
+bool is_subsampled_yuv(const uint32_t base_format)
+{
+	unsigned long i;
+
+	for (i = 0; i < num_formats; i++)
+	{
+		if (formats[i].id == (base_format & MALI_GRALLOC_INTFMT_FMT_MASK))
+		{
+			if (formats[i].is_yuv == true &&
+			    (formats[i].hsub > 1 || formats[i].vsub > 1))
+			{
+				return true;
+			}
+		}
+	}
+	return false;
 }
 

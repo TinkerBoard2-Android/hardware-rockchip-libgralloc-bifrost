@@ -292,7 +292,6 @@ static struct gralloc_drm_handle_t *create_bo_handle(int width,
 	handle->prime_fd = -1;
 	handle->layer_count = 1;
 
-#if RK_DRM_GRALLOC
 #ifdef USE_HWC2
   handle->ashmem_fd = -1;
 #endif
@@ -302,7 +301,7 @@ static struct gralloc_drm_handle_t *create_bo_handle(int width,
 #endif
 	handle->yuv_info = MALI_YUV_NO_INFO;
 	handle->phy_addr = 0;
-#endif
+
 	ALOGD_IF(RK_DRM_GRALLOC_DEBUG,"create_bo_handle handle: version=%d, numInts=%d, numFds=%d, magic=%x",
 		handle->base.version, handle->base.numInts,
 		handle->base.numFds, handle->magic);
@@ -346,7 +345,7 @@ struct gralloc_drm_bo_t *gralloc_drm_bo_create(struct gralloc_drm_t *drm,
 
 	if ( HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED == handle->format )
 	{
-		handle->format = (int)(handle->internal_format); // 'internal_format' 并未使用 ARM 的高位扩展标识.
+		handle->format = (int)(handle->internal_format); // 此时, 'internal_format' 并未使用 ARM 的高位扩展标识.
 	}
 	// .trick : video decoder/encoder, camera 等其他某块对 HAL_PIXEL_FORMAT_YCbCr_420_888 的处理方式可能和 mali, gralloc 有差异.
 	//	    这里 在 'handle->format' 中保留 HAL_PIXEL_FORMAT_YCbCr_420_888.

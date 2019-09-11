@@ -50,9 +50,7 @@
 
 #include <utils/CallStack.h>
 
-#if RK_DRM_GRALLOC
 #include <cutils/atomic.h>
-#endif
 
 #define UNUSED(...) (void)(__VA_ARGS__)
 
@@ -411,7 +409,6 @@ static int drm_mod_close_gpu0(struct hw_device_t *dev)
 	struct drm_module_t *dmod = (struct drm_module_t *)dev->module;
 	struct alloc_device_t *alloc = (struct alloc_device_t *) dev;
 
-#if RK_DRM_GRALLOC
 	android_atomic_dec(&dmod->refcount);
 
        if(!dmod->refcount && dmod->drm)
@@ -420,9 +417,6 @@ static int drm_mod_close_gpu0(struct hw_device_t *dev)
               gralloc_drm_destroy(dmod->drm);
               dmod->drm = NULL;
        }
-#else
-       gralloc_drm_destroy(dmod->drm);
-#endif
 	delete alloc;
 
 	return 0;
@@ -470,9 +464,7 @@ static int drm_mod_alloc_gpu0(alloc_device_t *dev,
 	bpp = gralloc_drm_get_bpp(actual_format);
 	if (!bpp)
 	{
-#if RK_DRM_GRALLOC
         LOG_ALWAYS_FATAL("Cann't get valid bpp for format(0x%x)", actual_format);
-#endif
 		return -EINVAL;
 	}
 	*stride = byte_stride / bpp;
@@ -485,9 +477,7 @@ static int drm_mod_open_gpu0(struct drm_module_t *dmod, hw_device_t **dev)
 	struct alloc_device_t *alloc;
 	int err;
 
-#if RK_DRM_GRALLOC
 	android_atomic_inc(&dmod->refcount);
-#endif
 
 	err = drm_init(dmod);
 	if (err)
@@ -550,9 +540,7 @@ drm_module_t::drm_module_t()
     mutex = PTHREAD_MUTEX_INITIALIZER;
     drm = NULL;
 
-#if RK_DRM_GRALLOC
     refcount = 0;
-#endif
 }
 
 struct drm_module_t HAL_MODULE_INFO_SYM;

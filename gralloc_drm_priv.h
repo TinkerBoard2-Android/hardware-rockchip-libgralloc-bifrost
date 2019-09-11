@@ -68,9 +68,7 @@ struct drm_module_t {
 	drm_module_t();
 #endif
 
-#if RK_DRM_GRALLOC
 	volatile int32_t refcount;
-#endif
 };
 
 /*

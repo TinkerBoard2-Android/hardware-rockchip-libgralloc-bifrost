@@ -48,7 +48,6 @@
 extern "C" {
 #endif
 
-#if RK_DRM_GRALLOC
 #define GRALLOC_UN_USED(arg)     (arg=arg)
 
 typedef enum
@@ -58,37 +57,67 @@ typedef enum
 	MALI_DPY_TYPE_HDLCD
 } mali_dpy_type;
 
-
-#if 0
-#if MALI_PRODUCT_ID_T86X != 1 \
-    && MALI_PRODUCT_ID_T76X != 1 \
-    && MALI_PRODUCT_ID_T72X != 1
-#error "we must define MALI_PRODUCT_ID_TXXX for current Mali GPU."
-#endif
-
-/* ??? mali-t860 ??? AFBC. */
-#if MALI_PRODUCT_ID_T86X == 1 && MALI_AFBC_GRALLOC != 1
-#error "we must enable AFBC for mali-t860."
-#endif
-
-#if MALI_PRODUCT_ID_T76X == 1 && MALI_AFBC_GRALLOC != 1
-#error "we must enable AFBC for mali-t760."
-#endif
-
-#if MALI_PRODUCT_ID_T72X == 1 && MALI_AFBC_GRALLOC == 1
-#error "we must NOT enable AFBC for mali-t720."
-#endif
-#endif
-
-#else
-#error
-#endif
-
 #if MALI_AFBC_GRALLOC != 1
 #define MALI_AFBC_GRALLOC 1
 #endif
 
 struct gralloc_drm_bo_t;
+
+/*
+ * Maximum number of pixel format planes.
+ * Plane [0]: Single plane formats (inc. RGB, YUV) and Y
+ * Plane [1]: U/V, UV
+ * Plane [2]: V/U
+ */
+#define MAX_PLANES 3
+
+typedef struct plane_info {
+
+	/*
+	 * Offset to plane (in bytes),
+	 * from the start of the allocation.
+	 */
+	uint32_t offset;
+
+	/*
+	 * Byte Stride: number of bytes between two vertically adjacent
+	 * pixels in given plane. This can be mathematically described by:
+	 *
+	 * byte_stride = ALIGN((alloc_width * bpp)/8, alignment)
+	 *
+	 * where,
+	 *
+	 * alloc_width: width of plane in pixels (c.f. pixel_stride)
+	 * bpp: average bits per pixel
+	 * alignment (in bytes): dependent upon pixel format and usage
+	 *
+	 * For uncompressed allocations, byte_stride might contain additional
+	 * padding beyond the alloc_width. For AFBC, alignment is zero.
+	 */
+	uint32_t byte_stride;
+
+	/*
+	 * Dimensions of plane (in pixels).
+	 *
+	 * For single plane formats, pixels equates to luma samples.
+	 * For multi-plane formats, pixels equates to the number of sample sites
+	 * for the corresponding plane, even if subsampled.
+	 *
+	 * AFBC compressed formats: requested width/height are rounded-up
+	 * to a whole AFBC superblock/tile (next superblock at minimum).
+	 * Uncompressed formats: dimensions typically match width and height
+	 * but might require pixel stride alignment.
+	 *
+	 * See 'byte_stride' for relationship between byte_stride and alloc_width.
+	 *
+	 * Any crop rectangle defined by GRALLOC_ARM_BUFFER_ATTR_CROP_RECT must
+	 * be wholly within the allocation dimensions. The crop region top-left
+	 * will be relative to the start of allocation.
+	 */
+	uint32_t alloc_width;
+	uint32_t alloc_height;
+} plane_info_t;
+
 
 /**
  * 对应 arm_gralloc 中的 private_handle_t.
@@ -97,10 +126,11 @@ struct gralloc_drm_handle_t {
     /* 基类子对象. */
 	native_handle_t base;
 
+    /*-------------------------------------------------------*/
+
 	/* file descriptors of the underlying dma_buf. */
 	int prime_fd;
 
-#if RK_DRM_GRALLOC
 #if MALI_AFBC_GRALLOC == 1
     /**
      * 用于存储和 AFBC 有关的 attributes 的 shared_memory 的 fd.
@@ -120,37 +150,77 @@ struct gralloc_drm_handle_t {
      */
 	int ashmem_fd;
 #endif
-        mali_dpy_type dpy_type;
 
-        uint64_t   internal_format;
-        int        internalWidth;
-        int        internalHeight;
-        int        byte_stride;
-        int        size;
-        int        ref;
-        int        pixel_stride;
-        
+    /*-------------------------------------------------------*/
+	/* integers */
+
+	int magic;
+
 	/*
-	 * Multi-layer buffers.
+	 * Input properties.
 	 *
-	 * Gralloc 1.0 supports multiple image layers within the same
-	 * buffer allocation, where GRALLOC1_CAPABILITY_LAYERED_BUFFERS is enabled.
-	 * 'layer_count' defines the number of layers that have been allocated.
-	 * All layers are the same size (in bytes) and 'size' defines the
-	 * number of bytes in the whole allocation.
-	 * Size of each layer = 'size' / 'layer_count'.
-	 * Offset to nth layer = n * ('size' / 'layer_count'),
-	 * where n=0 for the first layer.
+	 * width/height: Buffer dimensions.
+	 * producer/consumer_usage: Buffer usage (indicates IP)
 	 */
-	uint32_t layer_count;
-
-        union {
-                off_t    offset;
-                uint64_t padding4;
-        };
-
+	int width;
+	int height;
+	int format;
+	int usage;
     uint64_t consumer_usage;
     uint64_t producer_usage;
+
+	/*
+	 * DEPRECATED members.
+	 * Equivalent information can be obtained from other fields:
+	 *
+	 * - 'internal_format' --> alloc_format
+	 * - 'stride', 
+     *      mali_so 实际上不引用本成员, 
+     *      这里按照 rk_drm_gralloc 的传统, 其语义是 byte_stride.
+     *      而在 arm_gralloc 中 private_handle_t::stride 是 pixel_stride.
+     *
+	 * - 'byte_stride' ~= plane_info[0].byte_stride
+	 * - 'internalWidth' ~= plane_info[0].alloc_width
+	 * - 'internalHeight' ~= plane_info[0].alloc_height
+	 *
+	 * '~=' (approximately equal) is used because the fields were either previously
+	 * incorrectly populated by gralloc or the meaning has slightly changed.
+	 *
+	 * NOTE: 'stride' values sometimes vary significantly from plane_info[0].alloc_width.
+	 */
+    uint64_t   internal_format;
+	int stride;
+    int        byte_stride;
+    int        internalWidth;
+    int        internalHeight;
+
+	/*
+	 * Allocation properties.
+	 *
+	 * alloc_format: Pixel format (base + modifiers). NOTE: base might differ from requested
+	 *               format (req_format) where fallback to single-plane format was required.
+	 * plane_info:   Per plane allocation information.
+	 * size:         Total bytes allocated for buffer (inc. all planes, layers. etc.).
+	 * layer_count:  Number of layers allocated to buffer.
+	 *               All layers are the same size (in bytes).
+	 *               Multi-layers supported in v1.0, where GRALLOC1_CAPABILITY_LAYERED_BUFFERS is enabled.
+	 *               Layer size: 'size' / 'layer_count'.
+	 *               Layer (n) offset: n * ('size' / 'layer_count'), n=0 for the first layer.
+	 *
+	 */
+	uint64_t alloc_format;
+	plane_info_t plane_info[MAX_PLANES];
+    int        size;
+	uint32_t layer_count;
+
+    mali_dpy_type dpy_type;
+    int        ref;
+    int        pixel_stride;
+
+    union {
+        off_t    offset;
+        uint64_t padding4;
+    };
 
 #if MALI_AFBC_GRALLOC == 1
 	// locally mapped shared attribute area
@@ -166,19 +236,15 @@ struct gralloc_drm_handle_t {
 		uint64_t padding5;
 	};
 #endif
+
+	/*
+	 * Deprecated.
+	 * Use GRALLOC_ARM_BUFFER_ATTR_DATASPACE
+	 * instead.
+	 */
 	mali_gralloc_yuv_info yuv_info;
-#endif
-
-	/* integers */
-	int magic;
-
-	int width;
-	int height;
-	int format;
-	int usage;
 
 	int name;   /* the name of the bo */
-	int stride; /* the stride in bytes */
 	uint32_t phy_addr;
 	uint32_t reserve0;
 	uint32_t reserve1;
@@ -192,6 +258,14 @@ struct gralloc_drm_handle_t {
 
 	int data_owner; /* owner of data (for validation) */
         // value 是 pid, buffer 被 alloc 的时候 首次有效设置.
+
+    /*-------------------------------------------------------*/
+
+	bool is_multi_plane() const
+	{
+		/* For multi-plane, the byte stride for the second plane will always be non-zero. */
+		return (plane_info[1].byte_stride != 0);
+	}
 };
 
 /**

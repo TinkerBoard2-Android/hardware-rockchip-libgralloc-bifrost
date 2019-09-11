@@ -19,19 +19,22 @@ extern "C" {
 #include <rockchip/rockchip_drmif.h>
 }
 
+#include <cutils/properties.h>
+
 #include "rk_drm_gralloc_config.h"
+
 #include "gralloc_helper.h"
 #include "gralloc_drm.h"
 #include "gralloc_drm_priv.h"
-#if RK_DRM_GRALLOC
-#include <cutils/properties.h>
+#include "mali_gralloc_formats.h"
+#include "mali_gralloc_usages.h"
+#include "mali_gralloc_bufferallocation.h"
+#include "legacy/buffer_alloc.h"
 #if MALI_AFBC_GRALLOC == 1
 #include <inttypes.h>
 #include "gralloc_buffer_priv.h"
-#include "mali_gralloc_formats.h"
-#include "mali_gralloc_usages.h"
 #endif //end of MALI_AFBC_GRALLOC
-#endif //end of RK_DRM_GRALLOC
+
 #include <stdbool.h>
 #include <sys/stat.h>
 
@@ -279,8 +282,6 @@ static void rk_drm_adapter_close_gem_obj(struct rk_driver_of_gralloc_drm_device_
 
 /*---------------------------------------------------------------------------*/
 
-#if RK_DRM_GRALLOC
-
 #if RK_DRM_GRALLOC_DEBUG
 #ifndef AWAR
 #define AWAR(fmt, args...) __android_log_print(ANDROID_LOG_WARN, "[Gralloc-Warning]", "%s:%d " fmt,__func__,__LINE__,##args)
@@ -321,839 +322,7 @@ static void drm_gem_rockchip_free(struct gralloc_drm_drv_t *drv,
 
 /*---------------------------------------------------------------------------*/
 
-#define AFBC_PIXELS_PER_BLOCK 16
-#define AFBC_HEADER_BUFFER_BYTES_PER_BLOCKENTRY 16
-
-#define AFBC_BODY_BUFFER_BYTE_ALIGNMENT 1024
-#define AFBC_NORMAL_WIDTH_ALIGN 16
-#define AFBC_NORMAL_HEIGHT_ALIGN 16
-#define AFBC_WIDEBLK_WIDTH_ALIGN 32
-#define AFBC_WIDEBLK_HEIGHT_ALIGN 16
-// Regarding Tiled Headers AFBC mode, both header and body buffer should aligned to 4KB
-// and in non-wide mode (16x16), the width and height should be both rounded up to 128
-// in wide mode (32x8) the width should be rounded up to 256, the height should be rounded up to 64
-#define AFBC_TILED_HEADERS_BASIC_WIDTH_ALIGN 128
-#define AFBC_TILED_HEADERS_BASIC_HEIGHT_ALIGN 128
-#define AFBC_TILED_HEADERS_WIDEBLK_WIDTH_ALIGN 256
-#define AFBC_TILED_HEADERS_WIDEBLK_HEIGHT_ALIGN 64
-
-// This value is platform specific and should be set according to hardware YUV planes restrictions.
-// Please note that EGL winsys platform config file needs to use the same value when importing buffers.
-#define YUV_MALI_PLANE_ALIGN 128
-
-// Default YUV stride aligment in Android
 #define YUV_ANDROID_PLANE_ALIGN 16
-
-/*
- * Type of allocation
- */
-typedef enum AllocType
-{
-	UNCOMPRESSED = 0,
-	AFBC,
-	/* AFBC_WIDEBLK mode requires buffer to have 32 * 16 pixels alignment */
-	AFBC_WIDEBLK,
-	/* AN AFBC buffer with additional padding to ensure a 64-bte alignment
-	 * for each row of blocks in the header */
-	AFBC_PADDED,
-	/* AFBC_TILED_HEADERS_AFBC_BASIC mode requires buffer to have 128*128 pixels alignment(16x16 superblocks) */
-	AFBC_TILED_HEADERS_BASIC,
-	/* AFBC_TILED_HEADERS_AFBC_WIDEBLK mode requires buffer to have 256*64 pixels alignment(32x8 superblocks) */
-	AFBC_TILED_HEADERS_WIDEBLK,
-}   AllocType;
-
-/*
- * Computes the strides and size for an RGB buffer
- *
- * width               width of the buffer in pixels
- * height              height of the buffer in pixels
- * pixel_size          size of one pixel in bytes
- *
- * pixel_stride (out)  stride of the buffer in pixels
- * byte_stride  (out)  stride of the buffer in bytes
- * size         (out)  size of the buffer in bytes
- * type         (in)   if buffer should be allocated for afbc
- */
-static void get_rgb_stride_and_size(int width, int height, int pixel_size, int *pixel_stride, int *byte_stride,
-                                    size_t *size, AllocType type)
-{
-	int stride;
-
-	stride = width * pixel_size;
-
-	/* Align the lines to 64 bytes.
-	 * It's more efficient to write to 64-byte aligned addresses because it's the burst size on the bus */
-	stride = GRALLOC_ALIGN(stride, 64);
-
-	if (size != NULL)
-	{
-		*size = stride *height;
-	}
-
-	if (byte_stride != NULL)
-	{
-		*byte_stride = stride;
-	}
-
-	if (pixel_stride != NULL)
-	{
-		*pixel_stride = stride / pixel_size;
-	}
-
-	if (type != UNCOMPRESSED)
-	{
-		int w_aligned;
-		int h_aligned = GRALLOC_ALIGN(height, AFBC_NORMAL_HEIGHT_ALIGN);
-		int nblocks;
-		int buffer_byte_alignment = AFBC_BODY_BUFFER_BYTE_ALIGNMENT;
-
-		if (type == AFBC_TILED_HEADERS_BASIC)
-		{
-			w_aligned = GRALLOC_ALIGN(width, AFBC_TILED_HEADERS_BASIC_WIDTH_ALIGN);
-			h_aligned = GRALLOC_ALIGN(height, AFBC_TILED_HEADERS_BASIC_HEIGHT_ALIGN);
-			buffer_byte_alignment = 4 * AFBC_BODY_BUFFER_BYTE_ALIGNMENT;
-		}
-		else if (type == AFBC_TILED_HEADERS_WIDEBLK)
-		{
-			w_aligned = GRALLOC_ALIGN(width, AFBC_TILED_HEADERS_WIDEBLK_WIDTH_ALIGN);
-			h_aligned = GRALLOC_ALIGN(height, AFBC_TILED_HEADERS_WIDEBLK_HEIGHT_ALIGN);
-			buffer_byte_alignment = 4 * AFBC_BODY_BUFFER_BYTE_ALIGNMENT;
-		}
-		else if (type == AFBC_PADDED)
-		{
-			w_aligned = GRALLOC_ALIGN(width, 64);
-		}
-		else if (type == AFBC_WIDEBLK)
-		{
-			w_aligned = GRALLOC_ALIGN(width, AFBC_WIDEBLK_WIDTH_ALIGN);
-			h_aligned = GRALLOC_ALIGN(height, AFBC_WIDEBLK_HEIGHT_ALIGN);
-		}
-		else
-		{
-			w_aligned = GRALLOC_ALIGN(width, AFBC_NORMAL_WIDTH_ALIGN);
-		}
-
-		stride = w_aligned * pixel_size;
-		stride = GRALLOC_ALIGN(stride, 64);
-
-		if (byte_stride != NULL)
-		{
-			*byte_stride = stride;
-		}
-
-		if (pixel_stride != NULL)
-		{
-			*pixel_stride = stride / pixel_size;
-		}
-
-		nblocks = w_aligned / AFBC_PIXELS_PER_BLOCK * h_aligned / AFBC_PIXELS_PER_BLOCK;
-
-		if (size != NULL)
-		{
-			*size = stride *h_aligned +
-			        GRALLOC_ALIGN(nblocks * AFBC_HEADER_BUFFER_BYTES_PER_BLOCKENTRY, buffer_byte_alignment);
-		}
-	}
-}
-
-/*
- * Computes the strides and size for an AFBC 8BIT YUV 4:2:0 buffer
- *
- * width                Public known width of the buffer in pixels
- * height               Public known height of the buffer in pixels
- *
- * pixel_stride   (out) stride of the buffer in pixels
- * byte_stride    (out) stride of the buffer in bytes
- * size           (out) size of the buffer in bytes
- * type                 if buffer should be allocated for a certain afbc type
- * internalHeight (out) The internal height, which may be greater than the public known height.
- */
-static bool get_afbc_yuv420_8bit_stride_and_size(int width, int height, int *pixel_stride, int *byte_stride,
-                                                 size_t *size, AllocType type, int *internalHeight)
-{
-	int yuv420_afbc_luma_stride, yuv420_afbc_chroma_stride;
-	int buffer_byte_alignment = AFBC_BODY_BUFFER_BYTE_ALIGNMENT;
-
-	*internalHeight = height;
-
-#if MALI_VIDEO_VERSION != 0
-
-	/* If we have a greater internal height than public we set the internalHeight. This
-	 * implies that cropping will be applied of internal dimensions to fit the public one.
-	 *
-	 * NOTE: This should really only be done when the producer is determined to be VPU decoder.
-	 */
-	*internalHeight += AFBC_PIXELS_PER_BLOCK;
-#endif
-
-	/* The actual height used in size calculation must include the possible extra row. But
-	 * it must also be AFBC-aligned. Only the extra row-padding should be reported back in
-	 * internalHeight. This as only this row needs to be considered when cropping. */
-
-	if (type == UNCOMPRESSED)
-	{
-		AERR(" Buffer must be allocated with AFBC mode for internal pixel format YUV420_8BIT_AFBC!");
-		return false;
-	}
-	else if (type == AFBC_TILED_HEADERS_BASIC)
-	{
-		width = GRALLOC_ALIGN(width, AFBC_TILED_HEADERS_BASIC_WIDTH_ALIGN);
-		height = GRALLOC_ALIGN(*internalHeight, AFBC_TILED_HEADERS_BASIC_HEIGHT_ALIGN);
-		buffer_byte_alignment = 4 * AFBC_BODY_BUFFER_BYTE_ALIGNMENT;
-	}
-	else if (type == AFBC_TILED_HEADERS_WIDEBLK)
-	{
-		width = GRALLOC_ALIGN(width, AFBC_TILED_HEADERS_WIDEBLK_WIDTH_ALIGN);
-		height = GRALLOC_ALIGN(*internalHeight, AFBC_TILED_HEADERS_WIDEBLK_HEIGHT_ALIGN);
-		buffer_byte_alignment = 4 * AFBC_BODY_BUFFER_BYTE_ALIGNMENT;
-	}
-	else if (type == AFBC_PADDED)
-	{
-		AERR("GRALLOC_USAGE_PRIVATE_2 (64byte header row alignment for AFBC) is not supported for YUV");
-		return false;
-	}
-	else if (type == AFBC_WIDEBLK)
-	{
-		width = GRALLOC_ALIGN(width, AFBC_WIDEBLK_WIDTH_ALIGN);
-		height = GRALLOC_ALIGN(*internalHeight, AFBC_WIDEBLK_HEIGHT_ALIGN);
-	}
-	else
-	{
-		width = GRALLOC_ALIGN(width, AFBC_NORMAL_WIDTH_ALIGN);
-		height = GRALLOC_ALIGN(*internalHeight, AFBC_NORMAL_HEIGHT_ALIGN);
-	}
-
-	yuv420_afbc_luma_stride = width;
-	yuv420_afbc_chroma_stride = GRALLOC_ALIGN(yuv420_afbc_luma_stride / 2, 16); /* Horizontal downsampling*/
-
-	if (size != NULL)
-	{
-		int nblocks = width / AFBC_PIXELS_PER_BLOCK * height / AFBC_PIXELS_PER_BLOCK;
-		/* Simplification of (height * luma-stride + 2 * (height /2 * chroma_stride) */
-		*size = (yuv420_afbc_luma_stride + yuv420_afbc_chroma_stride) * height +
-		        GRALLOC_ALIGN(nblocks * AFBC_HEADER_BUFFER_BYTES_PER_BLOCKENTRY, buffer_byte_alignment);
-	}
-
-	if (byte_stride != NULL)
-	{
-		*byte_stride = yuv420_afbc_luma_stride;
-	}
-
-	if (pixel_stride != NULL)
-	{
-		*pixel_stride = yuv420_afbc_luma_stride;
-	}
-
-	return true;
-}
-
-/*
- * Computes the strides and size for an YV12 buffer
- *
- * width                  Public known width of the buffer in pixels
- * height                 Public known height of the buffer in pixels
- *
- * pixel_stride     (out) stride of the buffer in pixels
- * byte_stride      (out) stride of the buffer in bytes
- * size             (out) size of the buffer in bytes
- * type             (in)  if buffer should be allocated for a certain afbc type
- * internalHeight   (out) The internal height, which may be greater than the public known height.
- * stride_alignment (in)  stride aligment value in bytes.
- */
-static bool get_yv12_stride_and_size(int width, int height, int *pixel_stride, int *byte_stride, size_t *size,
-                                     AllocType type, int *internalHeight, int stride_alignment)
-{
-	int luma_stride;
-
-	if (type != UNCOMPRESSED)
-	{
-		return get_afbc_yuv420_8bit_stride_and_size(width, height, pixel_stride, byte_stride, size, type,
-		                                            internalHeight);
-	}
-
-	/* 4:2:0 formats must have buffers with even height and width as the clump size is 2x2 pixels.
-	 * Width will be even stride aligned anyway so just adjust height here for size calculation. */
-	height = GRALLOC_ALIGN(height, 2);
-
-	luma_stride = GRALLOC_ALIGN(width, stride_alignment);
-
-	if (size != NULL)
-	{
-		int chroma_stride = GRALLOC_ALIGN(luma_stride / 2, stride_alignment);
-		/* Simplification of ((height * luma_stride ) + 2 * ((height / 2) * chroma_stride)). */
-		*size = height *(luma_stride + chroma_stride);
-	}
-
-	if (byte_stride != NULL)
-	{
-		*byte_stride = luma_stride;
-	}
-
-	if (pixel_stride != NULL)
-	{
-		*pixel_stride = luma_stride;
-	}
-
-	return true;
-}
-
-/*
- * Computes the strides and size for an 8 bit YUYV 422 buffer
- *
- * width                  Public known width of the buffer in pixels
- * height                 Public known height of the buffer in pixels
- *
- * pixel_stride     (out) stride of the buffer in pixels
- * byte_stride      (out) stride of the buffer in bytes
- * size             (out) size of the buffer in bytes
- */
-static bool get_yuv422_8bit_stride_and_size(int width, int height, int *pixel_stride, int *byte_stride, size_t *size)
-{
-	int local_byte_stride, local_pixel_stride;
-
-	/* 4:2:2 formats must have buffers with even width as the clump size is 2x1 pixels.
-	 * This is taken care of by the even stride alignment. */
-
-	local_pixel_stride = GRALLOC_ALIGN(width, YUV_MALI_PLANE_ALIGN);
-	local_byte_stride = GRALLOC_ALIGN(width * 2, YUV_MALI_PLANE_ALIGN); /* 4 bytes per 2 pixels */
-
-	if (size != NULL)
-	{
-		*size = local_byte_stride *height;
-	}
-
-	if (byte_stride != NULL)
-	{
-		*byte_stride = local_byte_stride;
-	}
-
-	if (pixel_stride != NULL)
-	{
-		*pixel_stride = local_pixel_stride;
-	}
-
-	return true;
-}
-
-/*
- * Computes the strides and size for an AFBC 8BIT YUV 4:2:2 buffer
- *
- * width               width of the buffer in pixels
- * height              height of the buffer in pixels
- *
- * pixel_stride (out)  stride of the buffer in pixels
- * byte_stride  (out)  stride of the buffer in bytes
- * size         (out)  size of the buffer in bytes
- * type                if buffer should be allocated for a certain afbc type
- */
-static bool get_afbc_yuv422_8bit_stride_and_size(int width, int height, int *pixel_stride, int *byte_stride,
-                                                 size_t *size, AllocType type)
-{
-	int yuv422_afbc_luma_stride;
-	int buffer_byte_alignment = AFBC_BODY_BUFFER_BYTE_ALIGNMENT;
-
-	if (type == UNCOMPRESSED)
-	{
-		AERR(" Buffer must be allocated with AFBC mode for internal pixel format YUV422_8BIT_AFBC!");
-		return false;
-	}
-	else if (type == AFBC_TILED_HEADERS_BASIC)
-	{
-		width = GRALLOC_ALIGN(width, AFBC_TILED_HEADERS_BASIC_WIDTH_ALIGN);
-		height = GRALLOC_ALIGN(height, AFBC_TILED_HEADERS_BASIC_HEIGHT_ALIGN);
-		buffer_byte_alignment = 4 * AFBC_BODY_BUFFER_BYTE_ALIGNMENT;
-	}
-	else if (type == AFBC_TILED_HEADERS_WIDEBLK)
-	{
-		width = GRALLOC_ALIGN(width, AFBC_TILED_HEADERS_WIDEBLK_WIDTH_ALIGN);
-		height = GRALLOC_ALIGN(height, AFBC_TILED_HEADERS_WIDEBLK_HEIGHT_ALIGN);
-		buffer_byte_alignment = 4 * AFBC_BODY_BUFFER_BYTE_ALIGNMENT;
-	}
-	else if (type == AFBC_PADDED)
-	{
-		AERR("GRALLOC_USAGE_PRIVATE_2 (64byte header row alignment for AFBC) is not supported for YUV");
-		return false;
-	}
-	else if (type == AFBC_WIDEBLK)
-	{
-		width = GRALLOC_ALIGN(width, AFBC_WIDEBLK_WIDTH_ALIGN);
-		height = GRALLOC_ALIGN(height, AFBC_WIDEBLK_HEIGHT_ALIGN);
-	}
-	else
-	{
-		width = GRALLOC_ALIGN(width, AFBC_NORMAL_WIDTH_ALIGN);
-		height = GRALLOC_ALIGN(height, AFBC_NORMAL_HEIGHT_ALIGN);
-	}
-
-	yuv422_afbc_luma_stride = width;
-
-	if (size != NULL)
-	{
-		int nblocks = width / AFBC_PIXELS_PER_BLOCK * height / AFBC_PIXELS_PER_BLOCK;
-		/* YUV 4:2:2 luma size equals chroma size */
-		*size = yuv422_afbc_luma_stride *height * 2 +
-		        GRALLOC_ALIGN(nblocks * AFBC_HEADER_BUFFER_BYTES_PER_BLOCKENTRY, buffer_byte_alignment);
-	}
-
-	if (byte_stride != NULL)
-	{
-		*byte_stride = yuv422_afbc_luma_stride;
-	}
-
-	if (pixel_stride != NULL)
-	{
-		*pixel_stride = yuv422_afbc_luma_stride;
-	}
-
-	return true;
-}
-
-/*
- * Calculate strides and sizes for a P010 (Y-UV 4:2:0) or P210 (Y-UV 4:2:2) buffer.
- *
- * @param width         [in]    Buffer width.
- * @param height        [in]    Buffer height.
- * @param vss           [in]    Vertical sub-sampling factor (2 for P010, 1 for
- *                              P210. Anything else is invalid).
- * @param pixel_stride  [out]   Pixel stride; number of pixels between
- *                              consecutive rows.
- * @param byte_stride   [out]   Byte stride; number of bytes between
- *                              consecutive rows.
- * @param size          [out]   Size of the buffer in bytes. Cumulative sum of
- *                              sizes of all planes.
- *
- * @return true if the calculation was successful; false otherwise (invalid
- * parameter)
- */
-static bool get_yuv_pX10_stride_and_size(int width, int height, int vss, int *pixel_stride, int *byte_stride,
-                                         size_t *size)
-{
-	int luma_pixel_stride, luma_byte_stride;
-
-	if (vss < 1 || vss > 2)
-	{
-		AERR("Invalid vertical sub-sampling factor: %d, should be 1 or 2", vss);
-		return false;
-	}
-
-	/* 4:2:2 must have even width as the clump size is 2x1 pixels. This will be taken care of by the
-	 * even stride alignment */
-	if (vss == 2)
-	{
-		/* 4:2:0 must also have even height as the clump size is 2x2 */
-		height = GRALLOC_ALIGN(height, 2);
-	}
-
-	luma_pixel_stride = GRALLOC_ALIGN(width, YUV_MALI_PLANE_ALIGN);
-	luma_byte_stride = GRALLOC_ALIGN(width * 2, YUV_MALI_PLANE_ALIGN);
-
-	if (size != NULL)
-	{
-		int chroma_size = GRALLOC_ALIGN(width * 2, YUV_MALI_PLANE_ALIGN) * (height / vss);
-		*size = luma_byte_stride *height + chroma_size;
-	}
-
-	if (byte_stride != NULL)
-	{
-		*byte_stride = luma_byte_stride;
-	}
-
-	if (pixel_stride != NULL)
-	{
-		*pixel_stride = luma_pixel_stride;
-	}
-
-	return true;
-}
-
-/*
- *  Calculate strides and strides for Y210 (10 bit YUYV packed, 4:2:2) format buffer.
- *
- * @param width         [in]    Buffer width.
- * @param height        [in]    Buffer height.
- * @param pixel_stride  [out]   Pixel stride; number of pixels between
- *                              consecutive rows.
- * @param byte_stride   [out]   Byte stride; number of bytes between
- *                              consecutive rows.
- * @param size          [out]   Size of the buffer in bytes. Cumulative sum of
- *                              sizes of all planes.
- *
- * @return true if the calculation was successful; false otherwise (invalid
- * parameter)
- */
-static bool get_yuv_y210_stride_and_size(int width, int height, int *pixel_stride, int *byte_stride, size_t *size)
-{
-	int y210_byte_stride, y210_pixel_stride;
-
-	/* 4:2:2 formats must have buffers with even width as the clump size is 2x1 pixels.
-	 * This is taken care of by the even stride alignment */
-
-	y210_pixel_stride = GRALLOC_ALIGN(width, YUV_MALI_PLANE_ALIGN);
-	/* 4x16 bits per 2 pixels */
-	y210_byte_stride = GRALLOC_ALIGN(width * 4, YUV_MALI_PLANE_ALIGN);
-
-	if (size != NULL)
-	{
-		*size = y210_byte_stride *height;
-	}
-
-	if (byte_stride != NULL)
-	{
-		*byte_stride = y210_byte_stride;
-	}
-
-	if (pixel_stride != NULL)
-	{
-		*pixel_stride = y210_pixel_stride;
-	}
-
-	return true;
-}
-
-/*
- *  Calculate strides and strides for Y0L2 (YUYAAYVYAA, 4:2:0) format buffer.
- *
- * @param width         [in]    Buffer width.
- * @param height        [in]    Buffer height.
- * @param pixel_stride  [out]   Pixel stride; number of pixels between
- *                              consecutive rows.
- * @param byte_stride   [out]   Byte stride; number of bytes between
- *                              consecutive rows.
- * @param size          [out]   Size of the buffer in bytes. Cumulative sum of
- *                              sizes of all planes.
- *
- * @return true if the calculation was successful; false otherwise (invalid
- * parameter)
- *
- * @note Each YUYAAYVYAA clump encodes a 2x2 area of pixels. YU&V are 10 bits. A is 1 bit. total 8 bytes
- *
- */
-static bool get_yuv_y0l2_stride_and_size(int width, int height, int *pixel_stride, int *byte_stride, size_t *size)
-{
-	int y0l2_byte_stride, y0l2_pixel_stride;
-
-	/* 4:2:0 formats must have buffers with even height and width as the clump size is 2x2 pixels.
-	 * Width is take care of by the even stride alignment so just adjust height here for size calculation. */
-	height = GRALLOC_ALIGN(height, 2);
-
-	y0l2_pixel_stride = GRALLOC_ALIGN(width, YUV_MALI_PLANE_ALIGN);
-	y0l2_byte_stride = GRALLOC_ALIGN(width * 4, YUV_MALI_PLANE_ALIGN); /* 2 horiz pixels per 8 byte clump */
-
-	if (size != NULL)
-	{
-		*size = y0l2_byte_stride *height / 2; /* byte stride covers 2 vert pixels */
-	}
-
-	if (byte_stride != NULL)
-	{
-		*byte_stride = y0l2_byte_stride;
-	}
-
-	if (pixel_stride != NULL)
-	{
-		*pixel_stride = y0l2_pixel_stride;
-	}
-
-	return true;
-}
-
-/*
- *  Calculate strides and strides for Y410 (AVYU packed, 4:4:4) format buffer.
- *
- * @param width         [in]    Buffer width.
- * @param height        [in]    Buffer height.
- * @param pixel_stride  [out]   Pixel stride; number of pixels between
- *                              consecutive rows.
- * @param byte_stride   [out]   Byte stride; number of bytes between
- *                              consecutive rows.
- * @param size          [out]   Size of the buffer in bytes. Cumulative sum of
- *                              sizes of all planes.
- *
- * @return true if the calculation was successful; false otherwise (invalid
- * parameter)
- */
-static bool get_yuv_y410_stride_and_size(int width, int height, int *pixel_stride, int *byte_stride, size_t *size)
-{
-	int y410_byte_stride, y410_pixel_stride;
-
-	y410_pixel_stride = GRALLOC_ALIGN(width, YUV_MALI_PLANE_ALIGN);
-	y410_byte_stride = GRALLOC_ALIGN(width * 4, YUV_MALI_PLANE_ALIGN);
-
-	if (size != NULL)
-	{
-		/* 4x8bits per pixel */
-		*size = y410_byte_stride *height;
-	}
-
-	if (byte_stride != NULL)
-	{
-		*byte_stride = y410_byte_stride;
-	}
-
-	if (pixel_stride != NULL)
-	{
-		*pixel_stride = y410_pixel_stride;
-	}
-
-	return true;
-}
-
-/*
- *  Calculate strides and strides for YUV420_10BIT_AFBC (Compressed, 4:2:0) format buffer.
- *
- * @param width         [in]    Buffer width.
- * @param height        [in]    Buffer height.
- * @param pixel_stride  [out]   Pixel stride; number of pixels between
- *                              consecutive rows.
- * @param byte_stride   [out]   Byte stride; number of bytes between
- *                              consecutive rows.
- * @param size          [out]   Size of the buffer in bytes. Cumulative sum of
- *                              sizes of all planes.
- * @param type          [in]    afbc mode that buffer should be allocated with.
- *
- * @param internalHeight [out]  Internal buffer height that used by consumer or producer
- *
- * @return true if the calculation was successful; false otherwise (invalid
- * parameter)
- */
-static bool get_yuv420_10bit_afbc_stride_and_size(int width, int height, int *pixel_stride, int *byte_stride,
-                                                  size_t *size, AllocType type, int *internalHeight)
-{
-	int yuv420_afbc_byte_stride, yuv420_afbc_pixel_stride;
-	int buffer_byte_alignment = AFBC_BODY_BUFFER_BYTE_ALIGNMENT;
-
-	if (width & 3)
-	{
-		return false;
-	}
-
-	*internalHeight = height;
-#if MALI_VIDEO_VERSION
-	/* If we have a greater internal height than public we set the internalHeight. This
-	 * implies that cropping will be applied of internal dimensions to fit the public one. */
-	*internalHeight += AFBC_PIXELS_PER_BLOCK;
-#endif
-
-	/* The actual height used in size calculation must include the possible extra row. But
-	 * it must also be AFBC-aligned. Only the extra row-padding should be reported back in
-	 * internalHeight. This as only this row needs to be considered when cropping. */
-	if (type == UNCOMPRESSED)
-	{
-		AERR(" Buffer must be allocated with AFBC mode for internal pixel format YUV420_10BIT_AFBC!");
-		return false;
-	}
-	else if (type == AFBC_TILED_HEADERS_BASIC)
-	{
-		width = GRALLOC_ALIGN(width, AFBC_TILED_HEADERS_BASIC_WIDTH_ALIGN);
-		height = GRALLOC_ALIGN(*internalHeight / 2, AFBC_TILED_HEADERS_BASIC_HEIGHT_ALIGN);
-		buffer_byte_alignment = 4 * AFBC_BODY_BUFFER_BYTE_ALIGNMENT;
-	}
-	else if (type == AFBC_TILED_HEADERS_WIDEBLK)
-	{
-		width = GRALLOC_ALIGN(width, AFBC_TILED_HEADERS_WIDEBLK_WIDTH_ALIGN);
-		height = GRALLOC_ALIGN(*internalHeight / 2, AFBC_TILED_HEADERS_WIDEBLK_HEIGHT_ALIGN);
-		buffer_byte_alignment = 4 * AFBC_BODY_BUFFER_BYTE_ALIGNMENT;
-	}
-	else if (type == AFBC_PADDED)
-	{
-		AERR("GRALLOC_USAGE_PRIVATE_2 (64byte header row alignment for AFBC) is not supported for YUV");
-		return false;
-	}
-	else if (type == AFBC_WIDEBLK)
-	{
-		width = GRALLOC_ALIGN(width, AFBC_WIDEBLK_WIDTH_ALIGN);
-		height = GRALLOC_ALIGN(*internalHeight / 2, AFBC_WIDEBLK_HEIGHT_ALIGN);
-	}
-	else
-	{
-		width = GRALLOC_ALIGN(width, AFBC_NORMAL_WIDTH_ALIGN);
-		height = GRALLOC_ALIGN(*internalHeight / 2, AFBC_NORMAL_HEIGHT_ALIGN);
-	}
-
-	yuv420_afbc_pixel_stride = GRALLOC_ALIGN(width, 16);
-	yuv420_afbc_byte_stride = GRALLOC_ALIGN(width * 4, 16); /* 64-bit packed and horizontally downsampled */
-
-	if (size != NULL)
-	{
-		int nblocks = width / AFBC_PIXELS_PER_BLOCK * (*internalHeight) / AFBC_PIXELS_PER_BLOCK;
-		*size = yuv420_afbc_byte_stride *height +
-		        GRALLOC_ALIGN(nblocks * AFBC_HEADER_BUFFER_BYTES_PER_BLOCKENTRY, buffer_byte_alignment);
-	}
-
-	if (byte_stride != NULL)
-	{
-		*byte_stride = yuv420_afbc_pixel_stride;
-	}
-
-	if (pixel_stride != NULL)
-	{
-		*pixel_stride = yuv420_afbc_pixel_stride;
-	}
-
-	return true;
-}
-
-/*
- *  Calculate strides and strides for YUV422_10BIT_AFBC (Compressed, 4:2:2) format buffer.
- *
- * @param width         [in]    Buffer width.
- * @param height        [in]    Buffer height.
- * @param pixel_stride  [out]   Pixel stride; number of pixels between
- *                              consecutive rows.
- * @param byte_stride   [out]   Byte stride; number of bytes between
- *                              consecutive rows.
- * @param size          [out]   Size of the buffer in bytes. Cumulative sum of
- *                              sizes of all planes.
- * @param type          [in]    afbc mode that buffer should be allocated with.
- *
- * @return true if the calculation was successful; false otherwise (invalid
- * parameter)
- */
-static bool get_yuv422_10bit_afbc_stride_and_size(int width, int height, int *pixel_stride, int *byte_stride,
-                                                  size_t *size, AllocType type)
-{
-	int yuv422_afbc_byte_stride, yuv422_afbc_pixel_stride;
-	int buffer_byte_alignment = AFBC_BODY_BUFFER_BYTE_ALIGNMENT;
-
-	if (width & 3)
-	{
-		return false;
-	}
-
-	if (type == UNCOMPRESSED)
-	{
-		AERR(" Buffer must be allocated with AFBC mode for internal pixel format YUV422_10BIT_AFBC!");
-		return false;
-	}
-	else if (type == AFBC_TILED_HEADERS_BASIC)
-	{
-		width = GRALLOC_ALIGN(width, AFBC_TILED_HEADERS_BASIC_WIDTH_ALIGN);
-		height = GRALLOC_ALIGN(height, AFBC_TILED_HEADERS_BASIC_HEIGHT_ALIGN);
-		buffer_byte_alignment = 4 * AFBC_BODY_BUFFER_BYTE_ALIGNMENT;
-	}
-	else if (type == AFBC_TILED_HEADERS_WIDEBLK)
-	{
-		width = GRALLOC_ALIGN(width, AFBC_TILED_HEADERS_WIDEBLK_WIDTH_ALIGN);
-		height = GRALLOC_ALIGN(height, AFBC_TILED_HEADERS_WIDEBLK_HEIGHT_ALIGN);
-		buffer_byte_alignment = 4 * AFBC_BODY_BUFFER_BYTE_ALIGNMENT;
-	}
-	else if (type == AFBC_PADDED)
-	{
-		AERR("GRALLOC_USAGE_PRIVATE_2 (64byte header row alignment for AFBC) is not supported for YUV");
-		return false;
-	}
-	else if (type == AFBC_WIDEBLK)
-	{
-		width = GRALLOC_ALIGN(width, AFBC_WIDEBLK_WIDTH_ALIGN);
-		height = GRALLOC_ALIGN(height, AFBC_WIDEBLK_HEIGHT_ALIGN);
-	}
-	else
-	{
-		width = GRALLOC_ALIGN(width, AFBC_NORMAL_WIDTH_ALIGN);
-		height = GRALLOC_ALIGN(height, AFBC_NORMAL_HEIGHT_ALIGN);
-	}
-
-	yuv422_afbc_pixel_stride = GRALLOC_ALIGN(width, 16);
-	yuv422_afbc_byte_stride = GRALLOC_ALIGN(width * 2, 16);
-
-	if (size != NULL)
-	{
-		int nblocks = width / AFBC_PIXELS_PER_BLOCK * height / AFBC_PIXELS_PER_BLOCK;
-		/* YUV 4:2:2 chroma size equals to luma size */
-		*size = yuv422_afbc_byte_stride *height * 2 +
-		        GRALLOC_ALIGN(nblocks * AFBC_HEADER_BUFFER_BYTES_PER_BLOCKENTRY, buffer_byte_alignment);
-	}
-
-	if (byte_stride != NULL)
-	{
-		*byte_stride = yuv422_afbc_byte_stride;
-	}
-
-	if (pixel_stride != NULL)
-	{
-		*pixel_stride = yuv422_afbc_pixel_stride;
-	}
-
-	return true;
-}
-
-/*
- *  Calculate strides and strides for Camera RAW and Blob formats
- *
- * @param w             [in]    Buffer width.
- * @param h             [in]    Buffer height.
- * @param format        [in]    Requested HAL format
- * @param out_stride    [out]   Pixel stride; number of pixels/bytes between
- *                              consecutive rows. Format description calls for
- *                              either bytes or pixels.
- * @param size          [out]   Size of the buffer in bytes. Cumulative sum of
- *                              sizes of all planes.
- *
- * @return true if the calculation was successful; false otherwise (invalid
- * parameter)
- */
-static bool get_camera_formats_stride_and_size(int w, int h, uint64_t format, int *out_stride, size_t *out_size)
-{
-	int stride, size;
-
-	switch (format)
-	{
-	case HAL_PIXEL_FORMAT_RAW16:
-		stride = w; /* Format assumes stride in pixels */
-		stride = GRALLOC_ALIGN(stride, 16); /* Alignment mandated by Android */
-		size = stride * h * 2; /* 2 bytes per pixel */
-		break;
-
-	case HAL_PIXEL_FORMAT_RAW12:
-		if (w % 4 != 0)
-		{
-			ALOGE("ERROR: Width for HAL_PIXEL_FORMAT_RAW12 buffers has to be multiple of 4.");
-			return false;
-		}
-
-		stride = (w / 2) * 3; /* Stride in bytes; 2 pixels in 3 bytes */
-		size = stride * h;
-		break;
-
-	case HAL_PIXEL_FORMAT_RAW10:
-		if (w % 4 != 0)
-		{
-			ALOGE("ERROR: Width for HAL_PIXEL_FORMAT_RAW10 buffers has to be multiple of 4.");
-			return false;
-		}
-
-		stride = (w / 4) * 5; /* Stride in bytes; 4 pixels in 5 bytes */
-		size = stride * h;
-		break;
-
-	case HAL_PIXEL_FORMAT_BLOB:
-		if (h != 1)
-		{
-			ALOGE("ERROR: Height for HAL_PIXEL_FORMAT_BLOB must be 1.");
-			return false;
-		}
-
-		stride = 0; /* No 'rows', it's effectively a long one dimensional array */
-		size = w;
-		break;
-
-	default:
-		return false;
-	}
-
-	if (out_size != NULL)
-	{
-		*out_size = size;
-	}
-
-	if (out_stride != NULL)
-	{
-		*out_stride = stride;
-	}
-
-	return true;
-}
-
 
 static bool get_rk_nv12_stride_and_size(int width, int height, int* pixel_stride, int* byte_stride, size_t* size)
 {
@@ -1220,57 +389,7 @@ static bool get_rk_nv12_10bit_stride_and_size (int width, int height, int* pixel
     return true;
 }
 
-static void init_afbc(uint8_t *buf, uint64_t internal_format, int w, int h)
-{
-	uint32_t n_headers = (w * h) / 256;
-	uint32_t body_offset = n_headers * 16;
-	uint32_t headers[][4] = {
-		{ body_offset, 0x1, 0x10000, 0x0 }, /* Layouts 0, 3, 4 */
-		{ (body_offset + (1 << 28)), 0x80200040, 0x1004000, 0x20080 } /* Layouts 1, 5 */
-	};
-	uint32_t i, layout;
-
-	/* For AFBC 1.2, header buffer can be initilized to 0 for Layouts 0, 3, 4 */
-	if (internal_format & MALI_GRALLOC_INTFMT_AFBC_TILED_HEADERS)
-	{
-		memset(headers[0], 0, sizeof(uint32_t) * 4);
-	}
-	/* map format if necessary (also removes internal extension bits) */
-	uint64_t base_format = internal_format & MALI_GRALLOC_INTFMT_FMT_MASK;
-
-	switch (base_format)
-	{
-	case MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888:
-		/* Note that AFBC isn't supported for RGBX_8888 but the display drivers will treat it as RGBA8888
-		 * as a workaround for not supporting partial pre-fetch. However this format will be less
-		 * efficient for GPU. */
-	case MALI_GRALLOC_FORMAT_INTERNAL_RGBX_8888:
-	case MALI_GRALLOC_FORMAT_INTERNAL_RGB_888:
-	case MALI_GRALLOC_FORMAT_INTERNAL_RGB_565:
-	case MALI_GRALLOC_FORMAT_INTERNAL_BGRA_8888:
-		layout = 0;
-		break;
-
-	case MALI_GRALLOC_FORMAT_INTERNAL_YV12:
-	case MALI_GRALLOC_FORMAT_INTERNAL_NV12:
-	case MALI_GRALLOC_FORMAT_INTERNAL_NV21:
-		layout = 1;
-		break;
-
-	default:
-		layout = 0;
-	}
-
-	ALOGV("Writing AFBC header layout %d for format %" PRIu64, layout, base_format);
-
-	for (i = 0; i < n_headers; i++)
-	{
-		memcpy(buf, headers[layout], sizeof(headers[layout]));
-		buf += sizeof(headers[layout]);
-	}
-}
-
-#endif
+/*---------------------------------------------------------------------------*/
 
 #if RK_CTS_WORKROUND
 static bool ConvertCharToData(const char *pszHintName, const char *pszData, void *pReturn, IMG_DATA_TYPE eDataType)
@@ -1658,6 +777,8 @@ bool ModifyAppHintInFile(const char *pszFileName, const char *pszAppName,
 }
 #endif
 
+/*---------------------------------------------------------------------------*/
+
 static void drm_gem_rockchip_destroy(struct gralloc_drm_drv_t *drv)
 {
 	struct rk_driver_of_gralloc_drm_device_t *rk_drv = (struct rk_driver_of_gralloc_drm_device_t *)drv;
@@ -1683,66 +804,20 @@ static bool should_disable_afbc_in_fb_target_layer()
 #endif
 
 /**
- * rk_driver_of_gralloc_drm_device 中对 driver_of_gralloc_drm_device 的 alloc 方法的具体实现.
- * 注意 :
- *      本方法 同时实现 alloc buffer 和 import buffer 的功能,
- *      若传入的 'handle->prime_fd' < 0, 则将执行 alloc;
- *      若传入的 'handle->prime_fd' >= 0, 则将执行 import.
+ * 根据传入的 req_format 和 'usage', 选择合适的 internal_format, 并返回.
  */
-static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
-		struct gralloc_drm_drv_t *drv,
-		struct gralloc_drm_handle_t *handle)
+uint64_t rk_drm_gralloc_select_format(uint64_t req_format,
+                                      uint64_t usage,
+                                      const gralloc_drm_handle_t* handle)
 {
-	struct rk_driver_of_gralloc_drm_device_t *rk_drv = (struct rk_driver_of_gralloc_drm_device_t *)drv;
-	struct rockchip_buffer *buf;
-#if  !RK_DRM_GRALLOC
-        int ret, cpp, pitch, aligned_width, aligned_height;
-        uint32_t size, gem_handle;
-#else
-	int ret;
-	size_t size;
-	uint32_t gem_handle;
-	AllocType alloc_type = UNCOMPRESSED;
-	int internalWidth,internalHeight;
-	uint64_t internal_format;
-        int byte_stride;   // Stride of the buffer in bytes
-        int pixel_stride;  // Stride of the buffer in pixels - as returned in pStride
-        int w = handle->width,h = handle->height;
-        int format = handle->format;
-        int usage = handle->usage;
-        int err;
-        bool fmt_chg = false;
-        int fmt_bak = format;
-        void *addr = NULL;
+    uint64_t internal_format = req_format;
 #if USE_AFBC_LAYER
 	char framebuffer_size[PROPERTY_VALUE_MAX];
 	uint32_t width, height, vrefresh;
 #endif
-	uint32_t flags = 0;
-	struct drm_rockchip_gem_phys phys_arg;
-
-        D("enter, w : %d, h : %d, format : 0x%x, usage : 0x%x.", w, h, format, usage);
-
-    if ( NULL == rk_drv )
-    {
-        rk_drv = s_rk_drv;
-    }
-
-	phys_arg.phy_addr = 0;
-
-	/* Some formats require an internal width and height that may be used by
-	 * consumers/producers.
-	 */
-	internalWidth = w;
-	internalHeight = h;
-
-    internal_format = mali_gralloc_select_format(format,
-                                                 MALI_GRALLOC_FORMAT_TYPE_USAGE,
-                                                 usage,
-                                                 w * h);
 
     /*-------------------------------------------------------*/
-    // for afbc_framebuffer_target_layer
+    // 先处理可能的 afbc_layer.
 
 #if USE_AFBC_LAYER
 	property_get("persist.vendor.framebuffer.main", framebuffer_size, "0x0@60");
@@ -1752,11 +827,13 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 	{
 #define MAGIC_USAGE_FOR_AFBC_LAYER     (0x88)
         /* if current buffer is NOT for fb_target_layer, ... */
-        if (!(usage & GRALLOC_USAGE_HW_FB)) {
-	            if (!(usage & GRALLOC_USAGE_EXTERNAL_DISP) &&
-	                MAGIC_USAGE_FOR_AFBC_LAYER == (usage & MAGIC_USAGE_FOR_AFBC_LAYER) ) {
-	                internal_format = MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888 | MALI_GRALLOC_INTFMT_AFBC_BASIC;
+        if (!(usage & GRALLOC_USAGE_HW_FB)) 
+        {
+	            if ( !(usage & GRALLOC_USAGE_EXTERNAL_DISP)
+                    && MAGIC_USAGE_FOR_AFBC_LAYER == (usage & MAGIC_USAGE_FOR_AFBC_LAYER) ) 
+                {
 	                D("use_afbc_layer: force to set 'internal_format' to 0x%" PRIx64 " for usage '0x%x'.", internal_format, usage);
+	                internal_format = MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888 | MALI_GRALLOC_INTFMT_AFBC_BASIC;
 	            }
         }
         /* IS for fb_target_layer, ... */
@@ -1789,330 +866,326 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 			    property_set("vendor.gmali.fbdc_target","0");
 	        }
 	    }
+
+        /* 若已经被设置有别于 'req_format' 的 'internal_format', 则返回之. */
+        if ( internal_format != req_format )
+        {
+            return internal_format;
+        }
 	}
 #endif
 
     /*-------------------------------------------------------*/
-    // 来自 arm_gralloc 的逻辑, 根据 internal_format, w, h 等, 计算 side, stride 等.
 
-    /* Determine AFBC type for this format */
-    if (internal_format & MALI_GRALLOC_INTFMT_AFBCENABLE_MASK)
+    if ( req_format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED )
     {
-        if (internal_format & MALI_GRALLOC_INTFMT_AFBC_TILED_HEADERS)
+        if ( GRALLOC_USAGE_HW_VIDEO_ENCODER == (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER)
+            || GRALLOC_USAGE_HW_CAMERA_WRITE == (usage & GRALLOC_USAGE_HW_CAMERA_WRITE) )
         {
-            if (internal_format & MALI_GRALLOC_INTFMT_AFBC_WIDEBLK)
-            {
-                alloc_type = AFBC_TILED_HEADERS_WIDEBLK;
-            }
-            else if (internal_format & MALI_GRALLOC_INTFMT_AFBC_BASIC)
-            {
-                alloc_type = AFBC_TILED_HEADERS_BASIC;
-            }
-            else if (internal_format & MALI_GRALLOC_INTFMT_AFBC_SPLITBLK)
-            {
-                ALOGE("Unsupported format. Splitblk in tiled header configuration.");
-                return NULL;
-            }
-        }
-        else if (usage & MALI_GRALLOC_USAGE_AFBC_PADDING)
-        {
-            alloc_type = AFBC_PADDED;
-        }
-        else if (internal_format & MALI_GRALLOC_INTFMT_AFBC_WIDEBLK)
-        {
-            alloc_type = AFBC_WIDEBLK;
+            I("to select NV12 for HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED for usage : 0x%" PRIx64 ".", usage);
+            internal_format = HAL_PIXEL_FORMAT_YCrCb_NV12;
         }
         else
         {
-            alloc_type = AFBC;
+            I("to select RGBX_8888 for HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED for usage : 0x%" PRIx64 ".", usage);
+            internal_format = HAL_PIXEL_FORMAT_RGBX_8888;
         }
     }
-    
-    uint64_t base_format = internal_format & MALI_GRALLOC_INTFMT_FMT_MASK;
-
-    switch (base_format)
+    else if ( req_format == HAL_PIXEL_FORMAT_YCrCb_NV12_10
+            && USAGE_CONTAIN_VALUE(GRALLOC_USAGE_TO_USE_ARM_P010, GRALLOC_USAGE_ROT_MASK) )
     {
-        case HAL_PIXEL_FORMAT_RGBA_8888:
-        case HAL_PIXEL_FORMAT_RGBX_8888:
-        case HAL_PIXEL_FORMAT_BGRA_8888:
-//#if PLATFORM_SDK_VERSION >= 26
-        case HAL_PIXEL_FORMAT_RGBA_1010102:
-//#endif
-            get_rgb_stride_and_size(w, h, 4, &pixel_stride,
-                    &byte_stride, &size, alloc_type);
-            break;
-
-        case HAL_PIXEL_FORMAT_RGB_888:
-            get_rgb_stride_and_size(w, h, 3, &pixel_stride,
-                    &byte_stride, &size, alloc_type);
-            break;
-
-        case HAL_PIXEL_FORMAT_RGB_565:
-            get_rgb_stride_and_size(w, h, 2, &pixel_stride,
-                    &byte_stride, &size, alloc_type);
-            break;
-
-//#if PLATFORM_SDK_VERSION >= 26
-        case HAL_PIXEL_FORMAT_RGBA_FP16:
-            get_rgb_stride_and_size(w, h, 8, &pixel_stride,
-                                    &byte_stride, &size, alloc_type);
-            break;
-//#endif
-
-        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-        case MALI_GRALLOC_FORMAT_INTERNAL_YV12:
-        case MALI_GRALLOC_FORMAT_INTERNAL_NV12:
-        case MALI_GRALLOC_FORMAT_INTERNAL_NV21:
-            {
-                /* Mali subsystem prefers higher stride alignment values (128 bytes) for YUV, but software components assume
-                 * default of 16. We only need to care about YV12 as it's the only, implicit, HAL YUV format in Android.
-                 */
-                int yv12_align = YUV_MALI_PLANE_ALIGN;
-
-                if (usage & (GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK))
-                {
-                    yv12_align = YUV_ANDROID_PLANE_ALIGN;
-                }
-
-                if (!get_yv12_stride_and_size(w, h, &pixel_stride,
-                            &byte_stride, &size, alloc_type,
-                            &internalHeight, yv12_align))
-                {
-                    return NULL;
-                }
-
-                break;
-            }
-
-        case HAL_PIXEL_FORMAT_YCbCr_422_I:
-            {
-                /* YUYV 4:2:2 */
-                if (alloc_type != UNCOMPRESSED ||
-                        !get_yuv422_8bit_stride_and_size(w, h,
-                            &pixel_stride, &byte_stride,
-                            &size))
-                {
-                    return NULL;
-                }
-
-                break;
-            }
-
-        case HAL_PIXEL_FORMAT_RAW16:
-        case HAL_PIXEL_FORMAT_RAW12:
-        case HAL_PIXEL_FORMAT_RAW10:
-        case HAL_PIXEL_FORMAT_BLOB:
-            if (alloc_type != UNCOMPRESSED)
-            {
-                return NULL;
-            }
-
-            get_camera_formats_stride_and_size(w, h, base_format,
-                    &pixel_stride, &size);
-            /* For Raw/Blob formats stride is defined to be either in bytes or pixels per format */
-            byte_stride = pixel_stride;
-            break;
-
-        case MALI_GRALLOC_FORMAT_INTERNAL_Y0L2:
-
-            /* YUYAAYUVAA 4:2:0 with and without AFBC */
-            if (alloc_type != UNCOMPRESSED)
-            {
-                if (!get_yuv420_10bit_afbc_stride_and_size(
-                            w, h, &pixel_stride,
-                            &byte_stride, &size, alloc_type, &internalHeight))
-                {
-                    return NULL;
-                }
-            }
-            else
-            {
-                if (!get_yuv_y0l2_stride_and_size(w, h,
-                            &pixel_stride, &byte_stride,
-                            &size))
-                {
-                    return NULL;
-                }
-            }
-
-            break;
-
-        case MALI_GRALLOC_FORMAT_INTERNAL_P010:
-
-            /* Y-UV 4:2:0 */
-            if (alloc_type != UNCOMPRESSED ||
-                    !get_yuv_pX10_stride_and_size(w, h, 2,
-                        &pixel_stride, &byte_stride,
-                        &size))
-            {
-                return NULL;
-            }
-
-            break;
-
-        case MALI_GRALLOC_FORMAT_INTERNAL_P210:
-
-            /* Y-UV 4:2:2 */
-            if (alloc_type != UNCOMPRESSED ||
-                    !get_yuv_pX10_stride_and_size(w, h, 1,
-                        &pixel_stride, &byte_stride,
-                        &size))
-            {
-                return NULL;
-            }
-
-            break;
-
-        case MALI_GRALLOC_FORMAT_INTERNAL_Y210:
-
-            /* YUYV 4:2:2 with and without AFBC */
-            if (alloc_type != UNCOMPRESSED)
-            {
-                if (!get_yuv422_10bit_afbc_stride_and_size(w, h,
-                            &pixel_stride, &byte_stride,
-                            &size, alloc_type))
-                {
-                    return NULL;
-                }
-            }
-            else
-            {
-                if (!get_yuv_y210_stride_and_size(w, h,
-                            &pixel_stride, &byte_stride,
-                            &size))
-                {
-                    return NULL;
-                }
-            }
-
-            break;
-
-        case MALI_GRALLOC_FORMAT_INTERNAL_Y410:
-
-            /* AVYU 2-10-10-10 */
-            if (alloc_type != UNCOMPRESSED ||
-                    !get_yuv_y410_stride_and_size(w, h, &pixel_stride,
-                        &byte_stride, &size))
-            {
-                return NULL;
-            }
-
-            break;
-
-        case MALI_GRALLOC_FORMAT_INTERNAL_YUV422_8BIT:
-
-            /* 8BIT AFBC YUV4:2:2 testing usage */
-
-            /* We only support compressed for this format right now.
-             * Below will fail in case format is uncompressed.
-             */
-            if (!get_afbc_yuv422_8bit_stride_and_size(w, h,
-                        &pixel_stride, &byte_stride,
-                        &size, alloc_type))
-            {
-                return NULL;
-            }
-
-            break;
-
-            /*
-             * Additional custom formats can be added here
-             * and must fill the variables pixel_stride, byte_stride and size.
-             */
-        case HAL_PIXEL_FORMAT_YCrCb_NV12:
-            if (!get_rk_nv12_stride_and_size(w, h, &pixel_stride, &byte_stride, &size))
-            {
-                AERR("err.");
-                return NULL;
-            }
-            AINF("for nv12, w : %d, h : %d, pixel_stride : %d, byte_stride : %d, size : %zu; internalHeight : %d.",
-                    w,
-                    h,
-                    pixel_stride,
-                    byte_stride,
-                    size,
-                    internalHeight);
-            break;
-
-        case HAL_PIXEL_FORMAT_YCrCb_NV12_10:
-            if (!get_rk_nv12_10bit_stride_and_size(w, h, &pixel_stride, &byte_stride, &size))
-            {
-                AERR("err.");
-                return NULL;
-            }
-
-            AINF("for nv12_10, w : %d, h : %d, pixel_stride : %d, byte_stride : %d, size : %zu; internalHeight : %d.",
-                    w,
-                    h,
-                    pixel_stride,
-                    byte_stride,
-                    size,
-                    internalHeight);
-            break;
-
-        default:
-            E("unexpected 'base_format' : 0x%" PRIx64, base_format);
-            return NULL;
+        ALOGV("rk_debug force  MALI_GRALLOC_FORMAT_INTERNAL_P010 usage=0x%" PRIx64, usage);
+        internal_format = MALI_GRALLOC_FORMAT_INTERNAL_P010; // base_format of internal_format, no modifiers.
+    }
+    else if ( req_format == HAL_PIXEL_FORMAT_YCbCr_420_888 )
+    {
+	    I("to use HAL_PIXEL_FORMAT_YCrCb_NV12 for  %" PRIu64, req_format);
+	    internal_format = HAL_PIXEL_FORMAT_YCrCb_NV12;
+    }
+    else
+    {
+        internal_format = req_format;
     }
 
-    /*-------------------------------------------------------*/
+    return internal_format;
+}
 
-#if (1 == MALI_ARCHITECTURE_UTGARD)
-	/* match the framebuffer format */
-	if (usage & GRALLOC_USAGE_HW_FB)
-	{
-#ifdef GRALLOC_16_BITS
-		format = HAL_PIXEL_FORMAT_RGB_565;
-#else
-		format = HAL_PIXEL_FORMAT_RGBA_8888;
-#endif //end of GRALLOC_16_BITS
-	}
-#endif //end of MALI_ARCHITECTURE_UTGARD
-#endif //end of RK_DRM_GRALLOC
+/*
+ * 返回 'format' 是否是 rk 扩展的 hal_format.
+ */
+static bool is_rk_ext_hal_format(uint64_t format)
+{
+    if ( HAL_PIXEL_FORMAT_YCrCb_NV12 == format 
+        || HAL_PIXEL_FORMAT_YCrCb_NV12_10 == format )
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+/**
+ * rk_driver_of_gralloc_drm_device 中对 driver_of_gralloc_drm_device 的 alloc 方法的具体实现.
+ * 注意 :
+ *      本方法 同时实现 alloc buffer 和 import buffer 的功能,
+ *      若传入的 'handle->prime_fd' < 0, 则将执行 alloc;
+ *      若传入的 'handle->prime_fd' >= 0, 则将执行 import.
+ */
+static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(struct gralloc_drm_drv_t *drv,
+		                                               struct gralloc_drm_handle_t *handle)
+{
+    int ret;
+    int err;
+    struct rk_driver_of_gralloc_drm_device_t *rk_drv = (struct rk_driver_of_gralloc_drm_device_t *)drv;
+    struct rockchip_buffer *buf;
+
+    int w = handle->width,h = handle->height;
+    int format = handle->format;
+    int usage = handle->usage;
+
+    int internalWidth,internalHeight;
+    uint64_t internal_format;
+    int byte_stride;   // Stride of the buffer in bytes
+    int pixel_stride;  // Stride of the buffer in pixels
+	int old_alloc_width;
+	int old_alloc_height;
+    int old_byte_stride;
+
+    uint64_t alloc_format;
+    size_t size;
+    plane_info_t plane_info[MAX_PLANES];
+    int alloc_width;
+    int alloc_height;
+    
+
+    alloc_type_t alloc_type;
+
+    uint32_t gem_handle;
+    void *addr = NULL;
+    uint32_t flags = 0;
+    struct drm_rockchip_gem_phys phys_arg;
+
+
+    D("enter, w : %d, h : %d, format : 0x%x, usage : 0x%x.", w, h, format, usage);
+
+    if ( NULL == rk_drv )
+    {
+        rk_drv = s_rk_drv;
+    }
+
+    memset( (void*)plane_info, 0, sizeof(plane_info) );
+
+	phys_arg.phy_addr = 0;
+
+	/* Some formats require an internal width and height that may be used by
+	 * consumers/producers.
+	 */
+	internalWidth = w;
+	internalHeight = h;
+
+    internal_format = rk_drm_gralloc_select_format(format, usage, handle);
+    alloc_format = internal_format;
+    
+    if ( is_rk_ext_hal_format(alloc_format) )
+    {
+        /* 为 rk_ext_hal_format 的 待分配的 buffer 计算 size, byte_stride 等参数. */
+        // rk_video_decoder 模块对 alloc 的参数 有隐式的语义, 参见 get_rk_nv12_stride_and_size(), ...
+        // 所以, 这里无法使用来自 arm_gralloc 的计算逻辑.
+
+        uint64_t rk_ext_hal_format = alloc_format;
+
+        switch ( rk_ext_hal_format )
+        {
+            case HAL_PIXEL_FORMAT_YCrCb_NV12:
+                if (!get_rk_nv12_stride_and_size(w, h, &pixel_stride, &byte_stride, &size))
+                {
+                    E("err.");
+                    return NULL;
+                }
+                D("for rk_nv12, w : %d, h : %d, pixel_stride : %d, byte_stride : %d, size : %zu; internalHeight : %d.",
+                    w,
+                    h,
+                    pixel_stride,
+                    byte_stride,
+                    size,
+                    internalHeight);
+                break;
+
+            case HAL_PIXEL_FORMAT_YCrCb_NV12_10:
+                if (!get_rk_nv12_10bit_stride_and_size(w, h, &pixel_stride, &byte_stride, &size))
+                {
+                    E("err.");
+                    return NULL;
+                }
+                D("for nv12_10, w : %d, h : %d, pixel_stride : %d, byte_stride : %d, size : %zu; internalHeight : %d.",
+                        w,
+                        h,
+                        pixel_stride,
+                        byte_stride,
+                        size,
+                        internalHeight);
+                break;
+
+            default:
+                E("unexpected rk_ext_hal_format : %" PRIu64, rk_ext_hal_format);
+                return NULL;
+        }
+        
+        /*-----------------------------------*/
+        /* 计算 plane_info. */
+
+        plane_info[0].offset = 0;
+        plane_info[0].byte_stride = byte_stride;
+        plane_info[0].alloc_width = internalWidth;
+        plane_info[0].alloc_height = internalHeight;
+
+        plane_info[1].offset = byte_stride * internalHeight;
+        plane_info[1].byte_stride = byte_stride;
+        plane_info[1].alloc_width = internalWidth / 2;
+        plane_info[1].alloc_height = internalHeight / 2;
+            // " / 2" : 参照 arm_gralloc 对 MALI_GRALLOC_FORMAT_INTERNAL_NV12 格式的 buffer 的计算结果.
+            // 但是目前 使能 GRALLOC_USE_LEGACY_CALCS, 且 gralloc_drm_handle_t::byte_stride 非 0,
+            // mali_so 将仍旧使用 gralloc_drm_handle_t 的 "DEPRECATED members",
+            // 而不使用这里的 gralloc_drm_handle_t::plane_info.
+    }
+    else
+    {
+        /* 对 "非 rk_ext_hal_format 的 buffer", 使用来自 arm_gralloc 的逻辑, 计算 size, byte_stride 等参数. */
+        
+        alloc_width = w;
+        alloc_height = h;
+        int32_t format_idx;
+        
+        format_idx = get_format_index(alloc_format & MALI_GRALLOC_INTFMT_FMT_MASK);
+        if (format_idx == -1)
+        {
+            E("err.");
+            return NULL;
+        }
+        V("alloc_format: 0x%" PRIx64 " format_idx: %d", alloc_format, format_idx);
+
+        /*
+         * Obtain allocation type (uncompressed, AFBC basic, etc...)
+         */
+        if (!get_alloc_type(alloc_format & MALI_GRALLOC_INTFMT_EXT_MASK,
+                            format_idx,
+                            usage,
+                            &alloc_type))
+        {
+            E("err.");
+            return NULL;
+        }
+
+        if (!validate_format(&formats[format_idx], alloc_type, h))
+        {
+            E("err.");
+            return NULL;
+        }
+
+        /*
+         * Resolution of frame (allocation width and height) might require adjustment.
+         * This adjustment is only based upon specific usage and pixel format.
+         * If using AFBC, further adjustments to the allocation width and height will be made later
+         * based on AFBC alignment requirements and, for YUV, the plane properties.
+         */
+        mali_gralloc_adjust_dimensions(alloc_format,
+                                       usage,
+                                       &alloc_width,
+                                       &alloc_height);
+
+        /* Obtain buffer size and plane information. */
+        calc_allocation_size(alloc_width,
+                             alloc_height,
+                             alloc_type,
+                             formats[format_idx],
+                             usage & (GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK),
+                             usage & ~(GRALLOC_USAGE_PRIVATE_MASK | GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK),
+                             &pixel_stride,
+                             &size,
+                             plane_info);
+
+        /*-----------------------------------*/
+        /* 计算 buffer 的 legacy 参数, 参见 gralloc_drm_handle_t 定义中的 "DEPRECATED members.". */
+
+        /* Pre-fill legacy values with those calculated above
+         * since these are sometimes not set at all by the legacy calculations.
+         */
+        old_byte_stride = plane_info[0].byte_stride;
+        old_alloc_width = plane_info[0].alloc_width;
+        old_alloc_height = plane_info[0].alloc_height;
+
+        /* Translate to legacy alloc_type. */
+        legacy::alloc_type_t legacy_alloc_type;
+        switch (alloc_type.primary_type)
+        {
+            case AllocBaseType::AFBC:
+                legacy_alloc_type.primary_type = legacy::AllocBaseType::AFBC;
+                break;
+            case AllocBaseType::AFBC_WIDEBLK:
+                legacy_alloc_type.primary_type = legacy::AllocBaseType::AFBC_WIDEBLK;
+                break;
+            case AllocBaseType::AFBC_EXTRAWIDEBLK:
+                legacy_alloc_type.primary_type = legacy::AllocBaseType::AFBC_EXTRAWIDEBLK;
+                break;
+            default:
+                legacy_alloc_type.primary_type = legacy::AllocBaseType::UNCOMPRESSED;
+                break;
+        }
+        if (alloc_type.is_padded)
+        {
+            legacy_alloc_type.primary_type = legacy::AllocBaseType::AFBC_PADDED;
+        }
+        legacy_alloc_type.is_multi_plane = alloc_type.is_multi_plane;
+        legacy_alloc_type.is_tiled = alloc_type.is_tiled;
+
+        /*
+         * Resolution of frame (and internal dimensions) might require adjustment
+         * based upon specific usage and pixel format.
+         */
+        legacy::mali_gralloc_adjust_dimensions(internal_format,
+                                               usage,
+                                               legacy_alloc_type,
+                                               w,
+                                               h,
+                                               &old_alloc_width,
+                                               &old_alloc_height);
+
+        size_t legacy_size = 0;
+        int res = legacy::get_alloc_size(internal_format,
+                                         usage,
+                                         legacy_alloc_type,
+                                         old_alloc_width,
+                                         old_alloc_height, 
+                                         &old_byte_stride,
+                                         &pixel_stride,
+                                         &legacy_size);
+        if (res < 0)
+        {
+            ALOGW("Legacy allocation size calculation failed. "
+                    "Relying upon new calculation instead.");
+        }
+
+        internalWidth = old_alloc_width;
+        internalHeight = old_alloc_height;
+        byte_stride = old_byte_stride;
+
+        /* Accommodate for larger legacy allocation size. */
+        if (legacy_size > size)
+        {
+            size = legacy_size;
+        }
+    }
 
     /*-------------------------------------------------------*/
 
 	buf = (struct rockchip_buffer*)calloc(1, sizeof(*buf));
 	if (!buf) {
-#if RK_DRM_GRALLOC
 		AERR("Failed to allocate buffer wrapper\n");
-#else
-                ALOGE("Failed to allocate buffer wrapper\n");
-#endif
 		return NULL;
 	}
     buf->bo = NULL;
-
-    /*-------------------------------------------------------*/
-
-#if !RK_DRM_GRALLOC
-        cpp = gralloc_drm_get_bpp(handle->format);
-        if (!cpp) {
-                ALOGE("unrecognized format 0x%x", handle->format);
-                return NULL;
-        }
-
-	aligned_width = handle->width;
-	aligned_height = handle->height;
-	gralloc_drm_align_geometry(handle->format,
-			&aligned_width, &aligned_height);
-
-	/* TODO: We need to sort out alignment */
-	pitch = ALIGN(aligned_width * cpp, 64);
-	size = aligned_height * pitch;
-
-	if (handle->format == HAL_PIXEL_FORMAT_YCbCr_420_888) {
-		/*
-		 * WAR for H264 decoder requiring additional space
-		 * at the end of destination buffers.
-		 */
-		uint32_t w_mbs, h_mbs;
-
-		w_mbs = ALIGN(handle->width, 16) / 16;
-		h_mbs = ALIGN(handle->height, 16) / 16;
-		size += 64 * w_mbs * h_mbs;
-	}
-#endif
 
     /*-------------------------------------------------------*/
     // 根据 'usage' 预置待 alloc 或 import 的 flags, cachable 或 物理连续 等.
@@ -2182,22 +1255,76 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		}
 
 #if GRALLOC_INIT_AFBC == 1
-        if (!(usage & GRALLOC_USAGE_PROTECTED))
-        {
-                addr = rk_drm_adapter_map_rockchip_bo(buf->bo);
-                if (!addr) {
-                        E("failed to map bo");
-                        // LOG_ALWAYS_FATAL("failed to map bo");
-                        goto err_unref;
-                }
-        }
-
         if ( internal_format & MALI_GRALLOC_INTFMT_AFBCENABLE_MASK )
         {
+            if (!(usage & GRALLOC_USAGE_PROTECTED))
+            {
+                    addr = rk_drm_adapter_map_rockchip_bo(buf->bo);
+                    if (!addr) {
+                            E("failed to map bo");
+                            // LOG_ALWAYS_FATAL("failed to map bo");
+                            goto err_unref;
+                    }
+            }
+            else
+            {
+                E("we would not init the proteced afbc_buffer.");
+            }
+            
             if ( addr != NULL )
             {
-                D("to init afbc_buffer, addr : %p", addr);
-                init_afbc((uint8_t*)addr, internal_format, w, h);
+	            struct dma_buf_sync sync_args;
+                
+                /* 若当前 buffer 是 cachable 的, 则... */
+                if ( flags & ROCKCHIP_BO_CACHABLE )
+                {
+                    /* 向 kernel 空间声明 "将开始 CPU 对该 buffer 的写操作". */
+		            sync_args.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_WRITE;
+		            ret = ioctl(handle->prime_fd, DMA_BUF_IOCTL_SYNC, &sync_args);
+                    if ( ret != 0 )
+                    {
+                        E("DMA_BUF_IOCTL_SYNC start failed");
+                    }
+                }
+
+                /* < 对 afbc_buffer 具体初始化. > */
+                const bool is_multi_plane = handle->is_multi_plane();
+				for (int i = 0; i < MAX_PLANES && (i == 0 || plane_info[i].byte_stride != 0); i++)
+				{
+#if GRALLOC_USE_LEGACY_CALCS == 1
+					if (i == 0)
+					{
+						uint32_t w = GRALLOC_MAX((uint32_t)old_alloc_width, plane_info[0].alloc_width);
+						uint32_t h = GRALLOC_MAX((uint32_t)old_alloc_height, plane_info[0].alloc_height);
+
+						init_afbc( (uint8_t*)addr,
+						          internal_format,
+						          is_multi_plane,
+						          w,
+						          h);
+					}
+					else
+#endif
+					{
+						init_afbc( ( (uint8_t*)addr) + plane_info[i].offset,
+						          alloc_format,
+						          is_multi_plane,
+						          plane_info[i].alloc_width,
+						          plane_info[i].alloc_height);
+					}
+				}
+
+                /* 若当前 buffer 是 cachable 的, 则... */
+                if ( flags & ROCKCHIP_BO_CACHABLE )
+                {
+                    /* 向 kernel 空间声明 "已完成 CPU 对该 buffer 的写操作". */
+		            sync_args.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_WRITE;
+		            ret = ioctl(handle->prime_fd, DMA_BUF_IOCTL_SYNC, &sync_args);
+                    if ( ret != 0 )
+                    {
+                        E("DMA_BUF_IOCTL_SYNC end failed");
+                    }
+                }
             }
             else
             {
@@ -2209,7 +1336,6 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 
     /*-------------------------------------------------------*/
 
-#if RK_DRM_GRALLOC
 #if MALI_AFBC_GRALLOC == 1
         /*
          * If handle has been dup,then the fd is a negative number.
@@ -2301,25 +1427,38 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(
 		handle->phy_addr = phys_arg.phy_addr;
 	}
 
-        handle->stride = byte_stride;//pixel_stride;
-        handle->pixel_stride = pixel_stride;
-        handle->byte_stride = byte_stride;
-        handle->format = fmt_chg ? fmt_bak : format;
-        handle->size = size;
-        handle->offset = 0;
-        handle->internalWidth = internalWidth;
-        handle->internalHeight = internalHeight;
-        handle->internal_format = internal_format;
-#else
-        handle->stride = pitch;
-#endif
-        handle->name = 0;
+    handle->internal_format = internal_format;
+    handle->stride = byte_stride;
+    handle->byte_stride = byte_stride;
+    handle->internalWidth = internalWidth;
+    handle->internalHeight = internalHeight;
+
+    handle->alloc_format = alloc_format;
+    memcpy(handle->plane_info, plane_info, sizeof(plane_info_t) * MAX_PLANES);
+    handle->size = size;
+
+    handle->pixel_stride = pixel_stride;
+    handle->offset = 0;
+    handle->name = 0;
+
 	buf->base.handle = handle;
 
-        D("leave, w : %d, h : %d, format : 0x%x,internal_format : 0x%" PRIx64 ", usage : 0x%x. size=%d,pixel_stride=%d,byte_stride=%d",
-                handle->width, handle->height, handle->format,internal_format, handle->usage, handle->size,
-                pixel_stride,byte_stride);
-        D("leave: prime_fd=%d,share_attr_fd=%d",handle->prime_fd,handle->share_attr_fd);
+    D("leave, w : %d, h : %d, format : 0x%x,internal_format : 0x%" PRIx64 ", usage : 0x%x."
+            "size=%d, pixel_stride=%d, byte_stride=%d, internalWidth : %d,internalHeight : %d",
+        handle->width, handle->height, handle->format, internal_format, handle->usage,
+        handle->size, pixel_stride, byte_stride, internalWidth, internalHeight);
+    ALOGV("plane_info[0]: offset : %u, byte_stride : %u, alloc_width : %u, alloc_height : %u",
+            (handle->plane_info)[0].offset,
+            (handle->plane_info)[0].byte_stride,
+            (handle->plane_info)[0].alloc_width,
+            (handle->plane_info)[0].alloc_height);
+    ALOGV("plane_info[1]: offset : %u, byte_stride : %u, alloc_width : %u, alloc_height : %u",
+            (handle->plane_info)[1].offset,
+            (handle->plane_info)[1].byte_stride,
+            (handle->plane_info)[1].alloc_width,
+            (handle->plane_info)[1].alloc_height);
+
+    D("leave: prime_fd=%d,share_attr_fd=%d",handle->prime_fd,handle->share_attr_fd);
 
 	return &buf->base;
 
@@ -2352,7 +1491,6 @@ static void drm_gem_rockchip_free(struct gralloc_drm_drv_t *drv,
                 return;
         }
 
-#if RK_DRM_GRALLOC
 #if MALI_AFBC_GRALLOC == 1
 	gralloc_buffer_attr_free( gr_handle );
 #endif
@@ -2364,7 +1502,6 @@ static void drm_gem_rockchip_free(struct gralloc_drm_drv_t *drv,
 		close(gr_handle->prime_fd);
 
 	gr_handle->prime_fd = -1;
-#endif
         gralloc_drm_unlock_handle((buffer_handle_t)bo->handle);
 
     D("rk_drv : %p", rk_drv);
@@ -2467,7 +1604,6 @@ static void drm_gem_rockchip_unmap(struct gralloc_drm_drv_t *drv,
 	}
 }
 
-#if RK_DRM_GRALLOC
 static int drm_init_version()
 {
         char value[PROPERTY_VALUE_MAX];
@@ -2480,7 +1616,6 @@ static int drm_init_version()
 
         return 0;
 }
-#endif
 
 /**
  * 创建并返回 rk_driver_of_gralloc_drm_device 实例.
@@ -2491,9 +1626,7 @@ struct gralloc_drm_drv_t *gralloc_drm_drv_create_for_rockchip(int fd)
 {
 	struct rk_driver_of_gralloc_drm_device_t *rk_drv;
 
-#if RK_DRM_GRALLOC
         drm_init_version();
-#endif
 
     rk_drv = new rk_driver_of_gralloc_drm_device_t;
         // .KP : 这里 必须用 new 的方式, 只有这样 rk_drv->m_gem_objs_ref_info_map 的构造函数才会被调用.

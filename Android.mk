@@ -21,6 +21,8 @@
 
 # Android.mk for drm_gralloc
 
+ifeq ($(strip $(TARGET_BOARD_PLATFORM_GPU)), mali-tDVx)
+
 DRM_GPU_DRIVERS := $(strip $(filter-out swrast, $(BOARD_GPU_DRIVERS)))
 DRM_GPU_DRIVERS := rockchip
 intel_drivers := i915 i965 i915g ilo
@@ -291,3 +293,5 @@ include $(BUILD_SHARED_LIBRARY)
 
 endif # DRM_GPU_DRIVERS=prebuilt
 endif # DRM_GPU_DRIVERS
+
+endif

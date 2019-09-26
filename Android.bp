@@ -1,4 +1,0 @@
-vendor_public_library {
-    name: "libgralloc_drm",
-    symbol_file: "libgralloc_drm.map.txt",
-}

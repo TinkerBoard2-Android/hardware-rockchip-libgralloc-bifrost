@@ -70,13 +70,18 @@ static inline int gralloc_drm_get_bpp(int format)
 //#if PLATFORM_SDK_VERSION >= 26
 	case HAL_PIXEL_FORMAT_RGBA_1010102:
 //#endif
+	case HAL_PIXEL_FORMAT_DEPTH_32F:
+	case HAL_PIXEL_FORMAT_DEPTH_32F_STENCIL_8:
 		bpp = 4;
 		break;
 	case HAL_PIXEL_FORMAT_RGB_888:
+	case HAL_PIXEL_FORMAT_DEPTH_24:
+	case HAL_PIXEL_FORMAT_DEPTH_24_STENCIL_8:
 		bpp = 3;
 		break;
 	case HAL_PIXEL_FORMAT_RGB_565:
 	case HAL_PIXEL_FORMAT_YCbCr_422_I:
+	case HAL_PIXEL_FORMAT_DEPTH_16:
 		bpp = 2;
 		break;
 	/* planar; only Y is considered */

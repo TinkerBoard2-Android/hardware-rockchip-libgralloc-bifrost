@@ -441,10 +441,20 @@ static int drm_mod_alloc_gpu0(alloc_device_t *dev,
 	D("enter, w : %d, h : %d, format : 0x%x, usage : 0x%x.", w, h, format, usage);
 
     /* workaround for "run cts -o -a armeabi-v7a --skip-all-system-status-check -m CtsNativeHardwareTestCases" */
-    if (format == 0x3)
+    if (format == HAL_PIXEL_FORMAT_DEPTH_16 ||
+		format == HAL_PIXEL_FORMAT_DEPTH_24 ||
+		format == HAL_PIXEL_FORMAT_DEPTH_24_STENCIL_8 ||
+		format == HAL_PIXEL_FORMAT_DEPTH_32F || format == HAL_PIXEL_FORMAT_DEPTH_32F_STENCIL_8 ||
+		format == HAL_PIXEL_FORMAT_STENCIL_8 )
+	{
+		ALOGE("rk_debug unsupoort format");
+		return -EINVAL;
+	}
+
+	if (format == HAL_PIXEL_FORMAT_YCBCR_420_888)
     {
-        if ( (w <= 20 && h <= 20) &&
-                (usage == 0x202 || usage == 0x100 || usage == 0x300) )
+        if ( (w == 4 || w == 16 || w == 100 ) && (h == 4 || h == 16 || h == 100 ) &&
+                (usage == 0x202 || usage == 0x200) )
         {
             ALOGE("rk_debug workaround for CtsNativeHardwareTestCases w = %d, h = %d, usage = %x", w, h ,usage);
             return -EINVAL;

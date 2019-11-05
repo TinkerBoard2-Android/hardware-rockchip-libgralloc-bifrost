@@ -526,6 +526,57 @@ static int drm_mod_open(const struct hw_module_t *mod,
 	return err;
 }
 
+#define BAD_VALUE 3
+
+static int drm_validate_buffer_size(const gralloc_module_t *mod, buffer_handle_t handle,
+            uint32_t w, uint32_t h, int32_t format, int usage, int layer_count,
+            uint32_t stride)
+{
+	struct gralloc_drm_bo_t *bo;
+	int bpp;
+
+	bo = gralloc_drm_bo_from_handle(handle);
+	struct gralloc_drm_handle_t* hnd = (struct gralloc_drm_handle_t*)handle;
+
+	if ( w > hnd->width )
+	{
+		ALOGE("validateBufferSize failed, width is invaild");
+		return BAD_VALUE;
+	}
+
+	if ( h > hnd->height )
+    {
+        ALOGE("validateBufferSize failed, height is invaild");
+        return BAD_VALUE;
+    }
+
+	bpp = gralloc_drm_get_bpp(hnd->format);
+	if (stride > (hnd->stride / bpp ) )
+	{
+		ALOGE("validateBufferSize failed, stride is invaild");
+        return BAD_VALUE;
+	}
+
+	if ( format != hnd->format )
+    {
+        ALOGE("validateBufferSize failed, format is invaild");
+        return BAD_VALUE;
+    }
+
+	if ( layer_count > hnd->layer_count )
+	{
+		ALOGE("validateBufferSize failed, layer count is invaild");
+		return BAD_VALUE;
+	}
+
+	UNUSED(mod);
+	UNUSED(usage);
+
+	gralloc_drm_bo_decref(bo);
+
+	return 0;
+}
+
 static struct hw_module_methods_t drm_mod_methods = {
 	.open = drm_mod_open
 };
@@ -546,6 +597,7 @@ drm_module_t::drm_module_t()
     base.lock_ycbcr = drm_mod_lock_ycbcr;
     base.unlock = drm_mod_unlock;
     base.perform = drm_mod_perform;
+	base.validateBufferSize = drm_validate_buffer_size;
 
     mutex = PTHREAD_MUTEX_INITIALIZER;
     drm = NULL;

@@ -75,10 +75,9 @@ typedef enum
 	MALI_GRALLOC_FORMAT_INTERNAL_RGB_888 = HAL_PIXEL_FORMAT_RGB_888,
 	MALI_GRALLOC_FORMAT_INTERNAL_RGB_565 = HAL_PIXEL_FORMAT_RGB_565,
 	MALI_GRALLOC_FORMAT_INTERNAL_BGRA_8888 = HAL_PIXEL_FORMAT_BGRA_8888,
-#if PLATFORM_SDK_VERSION >= 26
 	MALI_GRALLOC_FORMAT_INTERNAL_RGBA_1010102 = HAL_PIXEL_FORMAT_RGBA_1010102,
+	/* 16-bit floating point format. */
 	MALI_GRALLOC_FORMAT_INTERNAL_RGBA_16161616 = HAL_PIXEL_FORMAT_RGBA_FP16,
-#endif /* PLATFORM_SDK_VERSION >= 26 */
 	MALI_GRALLOC_FORMAT_INTERNAL_YV12 = HAL_PIXEL_FORMAT_YV12,
 	MALI_GRALLOC_FORMAT_INTERNAL_Y8 = HAL_PIXEL_FORMAT_Y8,
 	MALI_GRALLOC_FORMAT_INTERNAL_Y16 = HAL_PIXEL_FORMAT_Y16,
@@ -91,7 +90,6 @@ typedef enum
 	MALI_GRALLOC_FORMAT_INTERNAL_RAW_OPAQUE = HAL_PIXEL_FORMAT_RAW_OPAQUE,
 	MALI_GRALLOC_FORMAT_INTERNAL_BLOB = HAL_PIXEL_FORMAT_BLOB,
 
-#if PLATFORM_SDK_VERSION >= 28
 	/* Depth and stencil formats */
 	MALI_GRALLOC_FORMAT_INTERNAL_DEPTH_16 = HAL_PIXEL_FORMAT_DEPTH_16,
 	MALI_GRALLOC_FORMAT_INTERNAL_DEPTH_24 = HAL_PIXEL_FORMAT_DEPTH_24,
@@ -99,7 +97,6 @@ typedef enum
 	MALI_GRALLOC_FORMAT_INTERNAL_DEPTH_32F = HAL_PIXEL_FORMAT_DEPTH_32F,
 	MALI_GRALLOC_FORMAT_INTERNAL_DEPTH_32F_STENCIL_8 = HAL_PIXEL_FORMAT_DEPTH_32F_STENCIL_8,
 	MALI_GRALLOC_FORMAT_INTERNAL_STENCIL_8 = HAL_PIXEL_FORMAT_STENCIL_8,
-#endif
 
 	/* Flexible YUV formats would be parsed but not have any representation as
      * internal format itself but one of the ones below
@@ -333,6 +330,7 @@ static inline uint64_t mali_gralloc_format_unwrap(int x)
 #define MALI_GRALLOC_FORMAT_CAPABILITY_AFBC_DOUBLE_BODY ((uint64_t)1 << 10)
 #define MALI_GRALLOC_FORMAT_CAPABILITY_AFBC_YUV_READ ((uint64_t)1 << 11)
 #define MALI_GRALLOC_FORMAT_CAPABILITY_AFBC_YUV_WRITE ((uint64_t)1 << 12)
+#define MALI_GRALLOC_FORMAT_CAPABILITY_AFBC_RGBA16161616 ((uint64_t)1 << 13)
 
 #define MALI_GRALLOC_FORMAT_CAPABILITY_PIXFMT_RGBA1010102 ((uint64_t)1 << 32)
 #define MALI_GRALLOC_FORMAT_CAPABILITY_PIXFMT_RGBA16161616 ((uint64_t)1 << 33)
@@ -361,7 +359,8 @@ void mali_gralloc_adjust_dimensions(const uint64_t internal_format,
 uint64_t mali_gralloc_select_format(const uint64_t req_format,
                                     const mali_gralloc_format_type type,
                                     const uint64_t usage,
-                                    const int buffer_size);
+                                    const int buffer_size,
+                                    uint64_t * const internal_format);
 
 bool is_subsampled_yuv(const uint32_t base_format);
 #endif

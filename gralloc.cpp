@@ -532,10 +532,8 @@ static int drm_validate_buffer_size(const gralloc_module_t *mod, buffer_handle_t
             uint32_t w, uint32_t h, int32_t format, int usage, int layer_count,
             uint32_t stride)
 {
-	struct gralloc_drm_bo_t *bo;
 	int bpp;
 
-	bo = gralloc_drm_bo_from_handle(handle);
 	struct gralloc_drm_handle_t* hnd = (struct gralloc_drm_handle_t*)handle;
 
 	if ( w > hnd->width )
@@ -571,8 +569,6 @@ static int drm_validate_buffer_size(const gralloc_module_t *mod, buffer_handle_t
 
 	UNUSED(mod);
 	UNUSED(usage);
-
-	gralloc_drm_bo_decref(bo);
 
 	return 0;
 }

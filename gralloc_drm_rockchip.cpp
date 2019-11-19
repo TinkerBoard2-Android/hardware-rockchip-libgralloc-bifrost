@@ -1408,7 +1408,13 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(struct gralloc_drm_drv_t 
 			break;
 
         case MALI_GRALLOC_USAGE_YUV_CONF_1:
-            handle->yuv_info = MALI_YUV_BT601_WIDE;
+			if (format == HAL_PIXEL_FORMAT_YCbCr_420_888)
+			{
+				ALOGD("Warning: yuv420_888 use BT601_narrow");
+				handle->yuv_info = MALI_YUV_BT601_NARROW;
+			}
+			else
+				handle->yuv_info = MALI_YUV_BT601_WIDE;
             break;
 
         case MALI_GRALLOC_USAGE_YUV_CONF_2:

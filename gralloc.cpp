@@ -557,8 +557,12 @@ static int drm_validate_buffer_size(const gralloc_module_t *mod, buffer_handle_t
 
 	if ( format != hnd->format )
     {
-        ALOGE("validateBufferSize failed, format is invaild");
-        return BAD_VALUE;
+		if ( (format != HAL_PIXEL_FORMAT_YCbCr_420_888 || format != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) && 
+				hnd->format != HAL_PIXEL_FORMAT_YCrCb_NV12 )
+		{
+			ALOGE("validateBufferSize failed, format is invaild, format = %x, hndfmt = %x", format, hnd->format);
+			return BAD_VALUE;
+		}
     }
 
 	if ( layer_count > hnd->layer_count )

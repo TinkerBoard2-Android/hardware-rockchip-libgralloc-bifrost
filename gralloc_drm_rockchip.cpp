@@ -11,9 +11,11 @@
 
 
 #include <log/log.h>
+#include <time.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <drm.h>
+#include <sys/types.h>
 
 extern "C" {
 #include <rockchip/rockchip_drmif.h>
@@ -74,8 +76,10 @@ struct dma_buf_sync {
 #define DMA_BUF_SYNC_END       (1 << 2)
 #define DMA_BUF_SYNC_VALID_FLAGS_MASK \
         (DMA_BUF_SYNC_RW | DMA_BUF_SYNC_END)
+#define DMA_BUF_NAME_LEN	32
 #define DMA_BUF_BASE            'b'
 #define DMA_BUF_IOCTL_SYNC      _IOW(DMA_BUF_BASE, 0, struct dma_buf_sync)
+#define DMA_BUF_SET_NAME	_IOW(DMA_BUF_BASE, 1, const char *)
 
 /* memory type definitions. */
 enum drm_rockchip_gem_mem_type {
@@ -803,6 +807,36 @@ static bool should_disable_afbc_in_fb_target_layer()
 }
 #endif
 
+/*
+ * 根据特定的规则 构建当前 buf 对应的底层 dmabuf 的 name,
+ * 并从 'name' 指向的 buffer 中返回.
+ *
+ * 这里的 dmabuf_name 格式是 : <tid>_<size>_<time>.
+ * tid : alloc 发生的线程的 tid.
+ * size : 预期的 buf 的 size.
+ * time : 当前的时间戳, 从 hour 到 us.
+ * 一个 dmabuf_name 的实例 : 478_26492928_15:55:55.034
+ */
+void get_dmabuf_name(size_t size, char* name)
+{
+    pid_t tid = gettid();
+    timespec time;
+    tm nowTime;
+    struct timeval tv;
+    struct timezone tz;
+
+    clock_gettime(CLOCK_REALTIME, &time);  //获取相对于1970到现在的秒数
+    localtime_r(&time.tv_sec, &nowTime);
+    gettimeofday(&tv, &tz);
+
+    snprintf(name,
+             DMA_BUF_NAME_LEN,
+             "%d_%zd_%02d:%02d:%02d.%03d",
+             tid,
+             size,
+             nowTime.tm_hour, nowTime.tm_min, nowTime.tm_sec, (int)(tv.tv_usec / 1000) );
+}
+
 /**
  * 根据传入的 req_format 和 'usage', 选择合适的 internal_format, 并返回.
  */
@@ -966,6 +1000,7 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(struct gralloc_drm_drv_t 
     void *addr = NULL;
     uint32_t flags = 0;
     struct drm_rockchip_gem_phys phys_arg;
+    char dmabuf_name[DMA_BUF_NAME_LEN];
 
 
     D("enter, w : %d, h : %d, format : 0x%x, usage : 0x%x.", w, h, format, usage);
@@ -1238,6 +1273,15 @@ static struct gralloc_drm_bo_t *drm_gem_rockchip_alloc(struct gralloc_drm_drv_t 
             E("failed to get prime_fd from rockchip_bo.");
 			goto failed_to_get_prime_fd;
 		}
+
+        get_dmabuf_name(size, dmabuf_name);
+        I("dmabuf_name : %s", dmabuf_name);
+        /* 设置 dma_buf 的 name. */
+        ret = ioctl(handle->prime_fd, DMA_BUF_SET_NAME, dmabuf_name);
+        if ( ret != 0 )
+        {
+            E("failed set name of dma_buf.");
+        }
 
         gem_handle = rk_drm_adapter_get_gem_handle(buf->bo);
 

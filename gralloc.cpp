@@ -551,8 +551,15 @@ static int drm_validate_buffer_size(const gralloc_module_t *mod, buffer_handle_t
 	bpp = gralloc_drm_get_bpp(hnd->format);
 	if (stride > (hnd->stride / bpp ) )
 	{
-		ALOGE("validateBufferSize failed, stride is invaild");
-        return BAD_VALUE;
+        if (hnd->stride > 0)
+        {
+            ALOGE("validateBufferSize failed, stride is invaild");
+            return BAD_VALUE;
+        }
+        else
+        {
+            ALOGE("validateBufferSize failed, hnd->stride is %d", hnd->stride);
+        }
 	}
 
 	if ( format != hnd->format )

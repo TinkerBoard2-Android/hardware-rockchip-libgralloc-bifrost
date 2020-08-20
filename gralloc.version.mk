@@ -37,9 +37,9 @@ else
     GRALLOC_VALID_VERSIONS := 1.x 2.x
 endif
 
-ifeq ($(GRALLOC_EXPERIMENTAL), 1)
+# ifeq ($(GRALLOC_EXPERIMENTAL), 1)
     GRALLOC_VALID_VERSIONS += 4.x
-endif
+# endif
 
 ifeq ($(filter $(GRALLOC_API_VERSION),$(GRALLOC_VALID_VERSIONS)),)
     $(error Gralloc version $(GRALLOC_API_VERSION) is not valid on the current platform. Valid versions are $(GRALLOC_VALID_VERSIONS))

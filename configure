@@ -134,7 +134,8 @@ if [ $PRIVATE_BUFFER = 1 ]; then
     echo "Private buffer interface build enabled."
 fi
 
-command pushd `dirname $0` > /dev/null
+# command pushd `dirname $0` > /dev/null
+command pushd $(pwd) > /dev/null
 
 # Clean all build files
 find . \( -name "Android.bp" ! -wholename "*src/Android.bp" \) -delete

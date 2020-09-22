@@ -16,6 +16,9 @@
  * limitations under the License.
  */
 
+#define ENABLE_DEBUG_LOG
+#include "../custom_log.h"
+
 #include <string.h>
 #include <dlfcn.h>
 #include <inttypes.h>
@@ -1489,6 +1492,52 @@ uint32_t get_base_format(const uint64_t req_format,
 	return get_internal_format(base_format, map_to_internal);
 }
 
+static uint64_t rk_gralloc_select_format(const uint64_t req_format,
+					 const uint64_t usage)
+{
+	GRALLOC_UNUSED(usage);
+	// uint32_t width, height, vrefresh;
+	// char framebuffer_size[PROPERTY_VALUE_MAX];
+	uint64_t internal_format = req_format;
+
+	/*-------------------------------------------------------*/
+	// 先处理可能的 afbc_layer.
+	// .T : 
+
+	/*-------------------------------------------------------*/
+
+	if ( HAL_PIXEL_FORMAT_YCrCb_NV12 == req_format )
+	{
+		I("to use 'MALI_GRALLOC_FORMAT_INTERNAL_NV12' as internal_format for req_format of 'HAL_PIXEL_FORMAT_YCrCb_NV12'");
+		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_NV12;
+	}
+	else if ( HAL_PIXEL_FORMAT_YCrCb_NV12_10 == req_format )
+	{
+		I("to use 'MALI_GRALLOC_FORMAT_INTERNAL_P010' as internal_format for req_format of 'HAL_PIXEL_FORMAT_YCrCb_NV12_10'");
+		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_P010; // 但实际上 这两种格式在 buffer layout 上 并不相同.
+	}
+        else if ( req_format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED )
+	{
+		if ( GRALLOC_USAGE_HW_VIDEO_ENCODER == (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER)
+			|| GRALLOC_USAGE_HW_CAMERA_WRITE == (usage & GRALLOC_USAGE_HW_CAMERA_WRITE) )
+		{
+			I("to select NV12 for HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED for usage : 0x%" PRIx64 ".", usage);
+			internal_format = MALI_GRALLOC_FORMAT_INTERNAL_NV12;
+		}
+		else
+		{
+			I("to select RGBX_8888 for HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED for usage : 0x%" PRIx64 ".", usage);
+			internal_format = HAL_PIXEL_FORMAT_RGBX_8888;
+		}
+	}
+	else if ( req_format == HAL_PIXEL_FORMAT_YCbCr_420_888 )
+	{
+		I("to use NV12 for  %" PRIu64, req_format);
+		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_NV12;
+	}
+
+	return internal_format;
+}
 
 /*
  * Select pixel format (base + modifier) for allocation.
@@ -1509,6 +1558,20 @@ uint64_t mali_gralloc_select_format(const uint64_t req_format,
                                     const int buffer_size,
                                     uint64_t * const internal_format)
 {
+/* < 若 USE_RK_SELECTING_FORMAT_MANNER 为 1, 则将使用 rk 的方式来选择 alloc_format 和 internal_format.> */
+#if USE_RK_SELECTING_FORMAT_MANNER
+// #error
+
+	GRALLOC_UNUSED(type);
+	GRALLOC_UNUSED(buffer_size);
+	uint64_t alloc_format;
+
+	*internal_format = rk_gralloc_select_format(req_format, usage);
+
+	alloc_format = *internal_format;
+
+	return alloc_format;
+#else
 	uint64_t alloc_format = MALI_GRALLOC_FORMAT_INTERNAL_UNDEFINED;
 
 	/*
@@ -1649,5 +1712,6 @@ out:
 	      req_format, usage, req_base_format, alloc_format, *internal_format);
 
 	return alloc_format;
+#endif
 }
 

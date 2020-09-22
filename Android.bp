@@ -64,6 +64,7 @@ arm_gralloc_cc_defaults {
 		"-DDISABLE_FRAMEBUFFER_HAL=1",
 		"-DGRALLOC_USE_LEGACY_CALCS=0",
 		"-DGRALLOC_USE_LEGACY_LOCK=0",
+		"-DUSE_RK_SELECTING_FORMAT_MANNER=1",
 	],
 	product_variables: {
 		platform_sdk_version: {

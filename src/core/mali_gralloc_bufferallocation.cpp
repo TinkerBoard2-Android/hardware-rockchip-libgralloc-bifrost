@@ -16,6 +16,9 @@
  * limitations under the License.
  */
 
+#define ENABLE_DEBUG_LOG
+#include "../custom_log.h"
+
 #include <inttypes.h>
 #include <assert.h>
 #include <atomic>
@@ -120,6 +123,106 @@ static rect_t get_afbc_sb_size(alloc_type_t alloc_type, const uint8_t plane)
 		return get_afbc_sb_size(alloc_type.primary_type);
 	}
 }
+
+/*
+ * 返回 "当前 alloc 操作 是否 应该 满足 implicit_requirement_for_rk_gralloc_allocate".
+ */
+static bool should_satisfy_implicit_requirement_for_rk_gralloc_allocate(uint64_t req_format,
+									uint64_t alloc_format,
+									uint64_t producer_usage,
+									uint64_t consumer_usage)
+{
+#if 0
+	GRALLOC_UNUSED(alloc_format);
+#else
+	GRALLOC_UNUSED(req_format);
+#endif
+	GRALLOC_UNUSED(producer_usage);
+	GRALLOC_UNUSED(consumer_usage);
+
+#if 0
+	if ( HAL_PIXEL_FORMAT_YCrCb_NV12 == req_format )
+#else
+	if ( MALI_GRALLOC_FORMAT_INTERNAL_NV12 == alloc_format )
+#endif
+	{
+		return true;
+	}
+
+	return false;
+}
+
+/*
+ * 计算满足 implicit_requirement_for_rk_gralloc_allocate 的 pixel_stride, size, plane_info 等信息.
+ *
+ * .KP : 对 HAL_PIXEL_FORMAT_YCrCb_NV12_10, 虽然 GPU 硬件无法直接处理该格式的 buffer,
+ *	 但是 SF 处理 buffer_of_sf_layer 的默认流程中仍旧会将该格式的 buffer import 为 egl_image,
+ *	 即 对应的 alloc_format(MALI_GRALLOC_FORMAT_INTERNAL_P010) 和 layout_info 对 mali_so(EGL) 仍旧必须是合理的(但非真实).
+ *	 对 HAL_PIXEL_FORMAT_YCrCb_NV12_10, implicit_requirement_for_rk_gralloc_allocate 要求
+ *		"将传入的 width 解析为 '真实的' byte_stride, size 是 2 * w * h"
+ *	 对于 size, 实际分配的格式为 MALI_GRALLOC_FORMAT_INTERNAL_P010 的 buffer 的 size 大于 '2 * w * h', 可以满足.
+ *	 综上, 本函数 "不" 调整 其 layout_info.
+ *
+ *	 而 hwc 等其他 vendor 模块需要的是 "真实的" pixel_stride 和 byte_stride 信息,
+ *	 需要在其他位置修改相关源码逻辑.
+ */
+static void calc_layout_info_satisfying_implicit_requirement_for_rk_gralloc_allocate(uint32_t width,
+										     uint32_t height,
+										     uint64_t req_format,
+										     uint64_t alloc_format,
+										     const format_info_t format,
+										     int* pixel_stride,
+										     size_t* size,
+										     plane_info_t plane_info[MAX_PLANES] )
+{
+	GRALLOC_UNUSED(alloc_format);
+
+	D("to calculate layout info for 'req_format' : 0x%" PRIx64, req_format);
+	switch ( req_format )
+	{
+		case HAL_PIXEL_FORMAT_YCrCb_NV12:
+		{
+			if ( width % 2 != 0 || height % 2 != 0 )
+			{
+				W("unexpected width(%d) or height(%d).", width, height);
+			}
+
+			/*
+			 * .KP : from CSY : video_decoder 要求的 buffer in NV12 的 Y_plane 的 byte_stride, 已经通过 width 传入.
+			 * 对 NV12 buffer 中的 Y_plane, byte_stride 就是 pixel_stride.
+			 */
+			*pixel_stride = (int)width;
+
+			plane_info_t* y_plane_info = &(plane_info[0]);
+			y_plane_info->offset = 0;
+			y_plane_info->alloc_width = *pixel_stride;
+			y_plane_info->byte_stride = (y_plane_info->alloc_width * format.bpp[0]) / 8;
+			y_plane_info->alloc_height = height;
+
+			plane_info_t* uv_plane_info = &(plane_info[1]);
+			uv_plane_info->offset = y_plane_info->byte_stride * y_plane_info->alloc_height;
+			uv_plane_info->alloc_width = width / format.hsub;
+			uv_plane_info->byte_stride = (uv_plane_info->alloc_width * format.bpp[1]) / 8;
+			uv_plane_info->alloc_height = height / format.vsub;
+
+			// 因为 GPU 需要直接处理 HAL_PIXEL_FORMAT_YCrCb_NV12 buffer,
+			// 上述 layout_info 对 mali_so 来说 也 "必须" 是合理的.
+
+			/*
+			 * .KP : from CSY : video_decoder 需要的 NV12 buffer 中除了 YUV 数据还有其他 metadata, 要更多的空间.
+			 *		    2 * w * h 一定够.
+			 */
+			*size = 2 * width * height;
+
+			break;
+		}
+		default:
+			E("unexpected 'req_format' : 0x%" PRIx64, req_format);
+			break;
+	}
+}
+
+/*---------------------------------------------------------------------------*/
 
 bool get_alloc_type(const uint64_t format_ext,
                     const uint32_t format_idx,
@@ -747,8 +850,58 @@ int mali_gralloc_derive_format_and_size(buffer_descriptor_t * const bufDescripto
 	                     &bufDescriptor->size,
 	                     bufDescriptor->plane_info);
 
+	/*-------------------------------------------------------*/
+	/* <为满足 implicit_requirement_for_rk_gralloc_alloc_interface_from_rk_video_decoder 的特殊处理.> */
+
+	int pixel_stride_rk;	// pixel stride to satisfy implicit_requirement_for_rk_gralloc_allocate,
+				// 即 rk_video_decoder 预期的值.
+	size_t size_rk;
+	plane_info_t plane_info_rk[MAX_PLANES];
+
+	memset(plane_info_rk, 0, sizeof(plane_info_rk) );
+
+	/* 若当前 alloc 操作 "应该" 满足 implicit_requirement_for_rk_gralloc_allocate, 则... */
+	if ( should_satisfy_implicit_requirement_for_rk_gralloc_allocate(bufDescriptor->hal_format, // 'req_format'
+									 bufDescriptor->alloc_format,
+									 bufDescriptor->producer_usage,
+									 bufDescriptor->consumer_usage) )
+	{
+		/* 计算满足 implicit_requirement_for_rk_gralloc_allocate 的 pixel_stride, size, plane_info 等信息. */
+		calc_layout_info_satisfying_implicit_requirement_for_rk_gralloc_allocate(bufDescriptor->width,
+											 bufDescriptor->height,
+											 bufDescriptor->hal_format, // 'req_format'
+											 bufDescriptor->alloc_format,
+											 formats[format_idx],
+											 &pixel_stride_rk,
+											 &size_rk,
+											 plane_info_rk);
+
+		/* 若 pixel stride 不同, 则 将 'bufDescriptor->pixel_stride' 调整为 'pixel_stride_rk'. */
+		if ( pixel_stride_rk != bufDescriptor->pixel_stride )
+		{
+			W("'pixel_stride_rk'(%d) is different from 'bufDescriptor->pixel_stride'(%d); "
+					"force to use pixel_stride_rk and plane_info_rk.",
+			  pixel_stride_rk,
+			  bufDescriptor->pixel_stride);
+			bufDescriptor->pixel_stride = pixel_stride_rk;
+
+			memcpy(bufDescriptor->plane_info, plane_info_rk, sizeof(plane_info_rk) );
+		}
+
+		if ( size_rk > bufDescriptor->size )
+		{
+			W("'size_rk'(%zd) is bigger than 'bufDescriptor->size'(%zd); "
+					"force to use size_rk.",
+			  size_rk,
+			  bufDescriptor->size);
+			bufDescriptor->size = size_rk;
+		}
+	}
+
+	/*-------------------------------------------------------*/
 
 #if GRALLOC_USE_LEGACY_CALCS == 1
+#error
 
 	/* Pre-fill legacy values with those calculated above
 	 * since these are sometimes not set at all by the legacy calculations.

@@ -31,7 +31,4 @@ cc_binary {
 		"liblog",
 		"libutils",
 	],
-	required: [
-		"android.hardware.graphics.allocator@4.0-impl-arm",
-	],
 }

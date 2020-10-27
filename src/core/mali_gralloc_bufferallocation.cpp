@@ -175,12 +175,12 @@ static void calc_layout_info_satisfying_implicit_requirement_for_rk_gralloc_allo
 										     size_t* size,
 										     plane_info_t plane_info[MAX_PLANES] )
 {
-	GRALLOC_UNUSED(alloc_format);
+	GRALLOC_UNUSED(req_format);
 
-	D("to calculate layout info for 'req_format' : 0x%" PRIx64, req_format);
-	switch ( req_format )
+	// D("to calculate layout info for 'req_format' : 0x%" PRIx64, req_format);
+	switch ( alloc_format )
 	{
-		case HAL_PIXEL_FORMAT_YCrCb_NV12:
+		case MALI_GRALLOC_FORMAT_INTERNAL_NV12:
 		{
 			if ( width % 2 != 0 || height % 2 != 0 )
 			{
@@ -217,7 +217,8 @@ static void calc_layout_info_satisfying_implicit_requirement_for_rk_gralloc_allo
 			break;
 		}
 		default:
-			E("unexpected 'req_format' : 0x%" PRIx64, req_format);
+			// E("unexpected 'req_format' : 0x%" PRIx64, req_format);
+			E("unexpected 'alloc_format' : 0x%" PRIx64, alloc_format);
 			break;
 	}
 }

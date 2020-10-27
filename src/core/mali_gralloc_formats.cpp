@@ -26,6 +26,8 @@
 #include <assert.h>
 #include <vector>
 
+#include <cutils/properties.h>
+
 #include <hardware/gralloc1.h>
 
 #include "gralloc_priv.h"
@@ -1492,6 +1494,15 @@ uint32_t get_base_format(const uint64_t req_format,
 	return get_internal_format(base_format, map_to_internal);
 }
 
+static bool should_disable_afbc_in_fb_target_layer()
+{
+	char value[PROPERTY_VALUE_MAX];
+
+	property_get("vendor.gralloc.disable_afbc", value, "0");
+
+	return (0 == strcmp("1", value) );
+}
+
 static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 					 const uint64_t usage)
 {
@@ -1504,6 +1515,42 @@ static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 	// 先处理可能的 afbc_layer.
 	// .T : 
 
+	if ( GRALLOC_USAGE_HW_FB == (usage & GRALLOC_USAGE_HW_FB) )
+	{
+		if ( !should_disable_afbc_in_fb_target_layer() )
+		{
+			char framebuffer_size[PROPERTY_VALUE_MAX];
+			uint32_t width, height, vrefresh;
+
+			property_get("persist.vendor.framebuffer.main", framebuffer_size, "0x0@60");
+			sscanf(framebuffer_size, "%dx%d@%d", &width, &height, &vrefresh);
+
+			//Vop cann't support 4K AFBC layer.
+			if (height < 2160)
+			{
+				I("to allocate buffer_of_fb_target_layer.");
+				internal_format = 
+					MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888
+					| MALI_GRALLOC_INTFMT_AFBC_BASIC
+					| MALI_GRALLOC_INTFMT_AFBC_YUV_TRANSFORM;
+
+				property_set("vendor.gmali.fbdc_target", "1"); // 继续遵循 rk_drm_gralloc 和 rk_drm_hwc 的约定.
+
+			}
+			else
+			{
+				I("buffer_of_fb_target_layer is too large to use AFBC, height : %u.", height);
+				internal_format = req_format;
+			}
+		}
+		else	// if ( !should_disable_afbc_in_fb_target_layer() )
+		{
+			I("AFBC IS disabled for fb_target_layer.");
+			internal_format = req_format;
+		}
+
+		return internal_format;
+	}
 	/*-------------------------------------------------------*/
 
 	if ( HAL_PIXEL_FORMAT_YCrCb_NV12 == req_format )

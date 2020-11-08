@@ -873,12 +873,13 @@ int mali_gralloc_ion_allocate(const gralloc_buffer_descriptor_t *descriptors,
 
 			// .T : dump "*hnd"
 			{
-			D("got new private_handle_t instance. share_fd : %d, flags : 0x%x, width : %d, height : %d, "
+			D("got new private_handle_t instance for buffer '%s'. share_fd : %d, flags : 0x%x, width : %d, height : %d, "
 				"req_format : 0x%x, producer_usage : 0x%" PRIx64 ", consumer_usage : 0x%" PRIx64 ", "
 				"internal_format : 0x%" PRIx64 ", stride : %d, byte_stride : %d, "
 				"internalWidth : %d, internalHeight : %d, "
 				"alloc_format : 0x%" PRIx64 ", size : %d, layer_count : %u, backing_store_size : %d, "
 				"allocating_pid : %d, ref_count : %d",
+				(bufDescriptor->name).c_str() == nullptr ? "unset" : (bufDescriptor->name).c_str(),
 			  hnd->share_fd, hnd->flags, hnd->width, hnd->height,
 			  hnd->req_format, hnd->producer_usage, hnd->consumer_usage,
 			  hnd->internal_format, hnd->stride, hnd->byte_stride,

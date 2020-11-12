@@ -19,7 +19,6 @@
 #ifndef MALI_GRALLOC_PRIVATE_INTERFACE_TYPES_H_
 #define MALI_GRALLOC_PRIVATE_INTERFACE_TYPES_H_
 
-#define GRALLOC_ARM_BUFFER_ATTR_HDR_INFO_SUPPORT
 #define GRALLOC_ARM_BUFFER_ATTR_DATASPACE_SUPPORT
 
 #include <assert.h>
@@ -30,55 +29,10 @@
 #define static_assert _Static_assert
 #endif
 #endif
-/*
- * Deprecated.
- * Use GRALLOC_ARM_BUFFER_ATTR_DATASPACE
- * instead.
- */
-typedef enum
-{
-	MALI_HDR_NO_INFO,
-	MALI_HDR_ST2084,
-	MALI_HDR_HLG,
-	MALI_HDR_LAST
-} mali_transfer_function;
-
-/* This structure needs to have the same layout on all architecures and compilers. */
-typedef struct
-{
-	//values are in units of 0.00002
-	uint16_t x;
-	uint16_t y;
-} primaries;
-
-static_assert(sizeof(primaries) == 4, "Unexpected size");
-
-/* This structure needs to have the same layout on all architecures and compilers. */
-typedef struct
-{
-	primaries r;
-	primaries g;
-	primaries b;
-	primaries w;
-	uint16_t minDisplayLuminance; // in cd/m^2
-	uint16_t maxDisplayLuminance; // in 0.0001 cd/m^2
-	uint16_t maxContentLightLevel; // in cd/m^2
-	uint16_t maxFrameAverageLightLevel; // in cd/m^2
-
-	/* Deprecated. Use GRALLOC_ARM_BUFFER_ATTR_DATASPACE instead. */
-	mali_transfer_function eotf;
-} mali_hdr_info;
-
-/*
- * The purpose of this assert is to ensure 32-bit and 64-bit ABIs have a consistent view
- * of the memory. The assert shouldn't contain any sizeof(), as sizeof() is ABI-dependent.
- */
-static_assert(sizeof(mali_transfer_function) == 4, "Unexpected size");
-static_assert(sizeof(mali_hdr_info) == (5 * 4) + (4 * 2), "Unexpected size");
 
 enum
 {
-	/* CROP_RECT and YUV_TRANS are intended to be
+	/* CROP_RECT is intended to be
 	 * written by producers and read by consumers.
 	 * A producer should write these parameters before
 	 * it queues a buffer to the consumer.
@@ -87,17 +41,8 @@ enum
 	/* CROP RECT, defined as an int array of top, left, height, width. Origin in top-left corner */
 	GRALLOC_ARM_BUFFER_ATTR_CROP_RECT = 1,
 
-	/* DEPRECATED. Set if the AFBC format used a YUV transform before compressing */
-	GRALLOC_ARM_BUFFER_ATTR_AFBC_YUV_TRANS = 2,
-
-	/* Set if the AFBC format uses sparse allocation */
-	GRALLOC_ARM_BUFFER_ATTR_AFBC_SPARSE_ALLOC = 3,
-
-	/* HDR Information. Required by Android Framework. */
-	GRALLOC_ARM_BUFFER_ATTR_HDR_INFO = 4,
-
 	/* Dataspace - used for YUV to RGB conversion. */
-	GRALLOC_ARM_BUFFER_ATTR_DATASPACE = 5,
+	GRALLOC_ARM_BUFFER_ATTR_DATASPACE = 2,
 
 	GRALLOC_ARM_BUFFER_ATTR_LAST
 };

@@ -37,7 +37,6 @@ struct attr_region
 	int32_t crop_left;
 	int32_t crop_height;
 	int32_t crop_width;
-	mali_hdr_info hdr_info;
 	android_dataspace_t dataspace;
 
 #ifdef __cplusplus
@@ -56,11 +55,8 @@ static_assert(sizeof(android_dataspace_t) == 4, "Unexpected size");
 /*
  * The purpose of this assert is to ensure 32-bit and 64-bit ABIs have a consistent view
  * of the memory. The assert shouldn't contain any sizeof(), as sizeof() is ABI-dependent.
- * The exception is the size of mali_hdr_info as there is an assertion for that alongside
- * its definition.
  */
-static_assert(sizeof(struct attr_region) ==
-    (5 * 4) + sizeof(mali_hdr_info), "Unexpected size");
+static_assert(sizeof(struct attr_region) == (5 * 4), "Unexpected size");
 
 typedef struct attr_region attr_region;
 
@@ -177,11 +173,6 @@ static inline int gralloc_buffer_attr_write(struct private_handle_t *hnd, buf_at
 			rval = 0;
 			break;
 
-		case GRALLOC_ARM_BUFFER_ATTR_HDR_INFO:
-			memcpy(&region->hdr_info, val, sizeof(mali_hdr_info));
-			rval = 0;
-			break;
-
 		case GRALLOC_ARM_BUFFER_ATTR_DATASPACE:
 			region->dataspace = *((android_dataspace_t *)val);
 			rval = 0;
@@ -216,11 +207,6 @@ static inline int gralloc_buffer_attr_read(struct private_handle_t *hnd, buf_att
 		{
 		case GRALLOC_ARM_BUFFER_ATTR_CROP_RECT:
 			memcpy(val, &region->crop_top, sizeof(int) * 4);
-			rval = 0;
-			break;
-
-		case GRALLOC_ARM_BUFFER_ATTR_HDR_INFO:
-			memcpy(val, &region->hdr_info, sizeof(mali_hdr_info));
 			rval = 0;
 			break;
 

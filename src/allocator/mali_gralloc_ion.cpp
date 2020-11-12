@@ -794,7 +794,7 @@ int mali_gralloc_ion_allocate(const gralloc_buffer_descriptor_t *descriptors,
 				tmp_fd = shared_fd;
 			}
 
-			private_handle_t *hnd = new private_handle_t(
+			private_handle_t *hnd = make_private_handle(
 			    private_handle_t::PRIV_FLAGS_USES_ION | priv_heap_flag, bufDescriptor->size,
 			    bufDescriptor->consumer_usage, bufDescriptor->producer_usage, tmp_fd, bufDescriptor->hal_format,
 			    bufDescriptor->old_internal_format, bufDescriptor->alloc_format,
@@ -853,7 +853,7 @@ int mali_gralloc_ion_allocate(const gralloc_buffer_descriptor_t *descriptors,
 				return -1;
 			}
 
-			private_handle_t *hnd = new private_handle_t(
+			private_handle_t *hnd = make_private_handle(
 			    private_handle_t::PRIV_FLAGS_USES_ION | priv_heap_flag, bufDescriptor->size,
 			    bufDescriptor->consumer_usage, bufDescriptor->producer_usage, shared_fd, bufDescriptor->hal_format,
 			    bufDescriptor->old_internal_format, bufDescriptor->alloc_format,

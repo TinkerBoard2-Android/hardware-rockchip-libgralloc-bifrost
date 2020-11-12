@@ -19,6 +19,7 @@
 #define MALI_GRALLOC_BUFFER_H_
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
@@ -26,6 +27,11 @@
 #include <cutils/native_handle.h>
 #include <string.h>
 
+#ifdef __cplusplus
+#include <new>
+#endif
+
+#include "mali_gralloc_log.h"
 #include "mali_gralloc_private_interface_types.h"
 
 /* the max string size of GRALLOC_HARDWARE_GPU0 & GRALLOC_HARDWARE_FB0
@@ -354,6 +360,27 @@ struct private_handle_t
 #ifndef __cplusplus
 /* Restore previous diagnostic for pedantic */
 #pragma GCC diagnostic pop
+#endif
+
+#ifdef __cplusplus
+static inline private_handle_t *make_private_handle(
+    int flags, int size, uint64_t consumer_usage, uint64_t producer_usage,
+    int shared_fd, int required_format, uint64_t internal_format, uint64_t allocated_format,
+    int width, int height, int stride, int internal_width, int internal_height, int byte_stride,
+    int backing_store_size, uint64_t layer_count, plane_info_t *plane_info)
+{
+	void *mem = native_handle_create(GRALLOC_ARM_NUM_FDS, NUM_INTS_IN_PRIVATE_HANDLE);
+	if (mem == nullptr)
+	{
+		MALI_GRALLOC_LOGE("private_handle_t allocation failed");
+		return nullptr;
+	}
+
+	return new(mem) private_handle_t(flags, size, consumer_usage, producer_usage,
+	                                 shared_fd, required_format, internal_format, allocated_format,
+	                                 width, height, stride, internal_width, internal_height, byte_stride,
+	                                 backing_store_size, layer_count, plane_info);
+}
 #endif
 
 #endif /* MALI_GRALLOC_BUFFER_H_ */

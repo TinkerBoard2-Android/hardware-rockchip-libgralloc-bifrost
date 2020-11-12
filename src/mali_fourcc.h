@@ -69,6 +69,14 @@ extern "C"
 #define DRM_FORMAT_R16 fourcc_code('R', '1', '6', ' ')
 #endif
 
+#ifndef DRM_FORMAT_Q410
+#define DRM_FORMAT_Q410 fourcc_code('Q', '4', '1', '0')
+#endif
+
+#ifndef DRM_FORMAT_Q401
+#define DRM_FORMAT_Q401 fourcc_code('Q', '4', '0', '1')
+#endif
+
 /* ARM specific modifiers. */
 #ifndef DRM_FORMAT_MOD_VENDOR_ARM
 #define DRM_FORMAT_MOD_VENDOR_ARM    0x08

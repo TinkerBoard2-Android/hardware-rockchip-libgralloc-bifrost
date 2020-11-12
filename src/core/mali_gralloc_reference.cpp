@@ -104,7 +104,7 @@ int mali_gralloc_reference_release(buffer_handle_t handle, bool canFree)
 				mali_gralloc_dump_buffer_erase(hnd);
 			}
 			mali_gralloc_buffer_free(handle);
-			delete handle;
+			native_handle_delete(const_cast<native_handle_t *>(handle));
 
 		}
 	}

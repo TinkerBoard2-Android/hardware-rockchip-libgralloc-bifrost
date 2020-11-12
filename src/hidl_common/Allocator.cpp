@@ -21,13 +21,14 @@
  */
 #define GRALLOC_USE_SHARED_METADATA (GRALLOC_VERSION_MAJOR > 3)
 
+#include "Allocator.h"
+
 #if GRALLOC_USE_SHARED_METADATA
 #include "SharedMetadata.h"
 #else
 #include "gralloc_buffer_priv.h"
 #endif
 
-#include "Allocator.h"
 #include "core/mali_gralloc_bufferallocation.h"
 #include "core/mali_gralloc_bufferdescriptor.h"
 #include "core/format_info.h"
@@ -103,7 +104,6 @@ void allocate(const buffer_descriptor_t &bufferDescriptor, uint32_t count, IAllo
 #else
 			new(hnd->attr_base) attr_region;
 #endif
-
 			const uint32_t base_format = bufferDescriptor.alloc_format & MALI_GRALLOC_INTFMT_FMT_MASK;
 			const uint64_t usage = bufferDescriptor.consumer_usage | bufferDescriptor.producer_usage;
 			android_dataspace_t dataspace;
@@ -168,6 +168,7 @@ void allocate(const buffer_descriptor_t &bufferDescriptor, uint32_t count, IAllo
 	for (const auto &buffer : grallocBuffers)
 	{
 		mali_gralloc_buffer_free(buffer.getNativeHandle());
+		native_handle_delete(const_cast<native_handle_t *>(buffer.getNativeHandle()));
 	}
 }
 

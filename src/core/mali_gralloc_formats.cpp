@@ -1494,6 +1494,34 @@ uint32_t get_base_format(const uint64_t req_format,
 	return get_internal_format(base_format, map_to_internal);
 }
 
+typedef enum rk_board_platform_t
+{
+	RK3326,
+	RK356X,
+	RK_BOARD_PLATFORM_UNKNOWN,
+} rk_board_platform_t;
+
+static rk_board_platform_t get_rk_board_platform()
+{
+	char value[PROPERTY_VALUE_MAX];
+
+	property_get("ro.board.platform", value, "0");
+
+	if (0 == strcmp("rk3326", value) )
+	{
+		return RK3326;
+	}
+	else if (0 == strcmp("rk356x", value) )
+	{
+		return RK356X;
+	}
+	else
+	{
+		LOG_ALWAYS_FATAL("unexpected 'value' : %s", value);
+		return RK_BOARD_PLATFORM_UNKNOWN;
+	}
+}
+
 static bool is_rk_ext_hal_format(const uint64_t hal_format)
 {
 	if ( HAL_PIXEL_FORMAT_YCrCb_NV12 == hal_format
@@ -1574,11 +1602,29 @@ static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 	{
 		if ( !should_disable_afbc_in_fb_target_layer() )
 		{
-			I("to allocate AFBC buffer for fb_target_layer.");
-			internal_format = 
-				MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888
-				| MALI_GRALLOC_INTFMT_AFBC_BASIC
-				| MALI_GRALLOC_INTFMT_AFBC_YUV_TRANSFORM;
+			rk_board_platform_t platform = get_rk_board_platform();
+			switch ( platform )
+			{
+			case RK3326:
+				I("to allocate AFBC buffer for fb_target_layer on rk3326.");
+				internal_format = 
+					MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888
+					| MALI_GRALLOC_INTFMT_AFBC_BASIC
+					| MALI_GRALLOC_INTFMT_AFBC_YUV_TRANSFORM;
+
+				break;
+
+			case RK356X:
+				I("to allocate AFBC buffer for fb_target_layer on rk356x.");
+				internal_format = 
+					MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888
+					| MALI_GRALLOC_INTFMT_AFBC_BASIC;
+				break;
+
+			default:
+				LOG_ALWAYS_FATAL("unexpected 'platform' : %d", platform);
+				break;
+			}
 
 			property_set("vendor.gmali.fbdc_target", "1"); // 继续遵循 rk_drm_gralloc 和 rk_drm_hwc 的约定.
 		}

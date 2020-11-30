@@ -1639,6 +1639,29 @@ static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 	/* 否则, 即 当前 buffer 用于 sf_client_layer, 则... */
 	else
 	{
+		/* 若 CPU "不会" 读写 buffer,
+		 * 且 VPU "不会" 读 buffer (to encode),
+		 * 且 camera "不会" 读写 buffer,
+		 * 则... */
+		if ( 0 == (usage & (GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK) )
+				&& 0 == (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER)
+				&& 0 == (usage & GRALLOC_USAGE_HW_CAMERA_WRITE)
+				&& 0 == (usage & GRALLOC_USAGE_HW_CAMERA_READ) )
+		{
+			/* 若 internal_format 不是 nv12,
+			   且 不是 nv12_10,
+			   且 不是 MALI_GRALLOC_FORMAT_INTERNAL_P010,
+			   则... */
+			if ( internal_format != HAL_PIXEL_FORMAT_YCrCb_NV12
+					&& internal_format != HAL_PIXEL_FORMAT_YCrCb_NV12_10
+					&& internal_format != MALI_GRALLOC_FORMAT_INTERNAL_P010)
+			{
+				/* 强制将 'internal_format' 设置为对应的 AFBC 格式. */
+				internal_format = internal_format | MALI_GRALLOC_INTFMT_AFBC_BASIC;
+				I("use_afbc_layer: force to set 'internal_format' to 0x%" PRIx64 " for usage '0x%" PRIx64,
+						internal_format, usage);
+			}
+		}
 	}
 
 	/*-------------------------------------------------------*/

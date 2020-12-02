@@ -162,6 +162,7 @@ int validate_lock_input_parameters(const buffer_handle_t buffer, const int l,
 		return -EINVAL;
 	}
 
+#if 0
 	/* Reject lock requests for AFBC (compressed format) enabled buffers */
 	if ((hnd->alloc_format & MALI_GRALLOC_INTFMT_EXT_MASK) != 0)
 	{
@@ -170,6 +171,7 @@ int validate_lock_input_parameters(const buffer_handle_t buffer, const int l,
 
 		return GRALLOC1_ERROR_UNSUPPORTED;
 	}
+#endif
 
 	/* Producer and consumer usage is verified in gralloc1 specific code. */
 	GRALLOC_UNUSED(usage);

@@ -1592,6 +1592,10 @@ static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 		/* 用 ARM 定义的规则, 从 'req_format' 得到 'internal_format'. */
 		internal_format = get_internal_format(req_format,
 						      true);	// 'map_to_internal'
+		if ( MALI_GRALLOC_FORMAT_INTERNAL_UNDEFINED == internal_format )
+		{
+			internal_format = req_format;
+		}
 	}
 
 	/*-------------------------------------------------------*/
@@ -1652,7 +1656,7 @@ static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 			   且 不是 MALI_GRALLOC_FORMAT_INTERNAL_P010,
 			   则... */
 			if ( internal_format != MALI_GRALLOC_FORMAT_INTERNAL_NV12
-					&& internal_format != MALI_GRALLOC_FORMAT_INTERNAL_P010 )
+				&& internal_format != MALI_GRALLOC_FORMAT_INTERNAL_P010 )
 			{
 				/* 强制将 'internal_format' 设置为对应的 AFBC 格式. */
 				internal_format = internal_format | MALI_GRALLOC_INTFMT_AFBC_BASIC;

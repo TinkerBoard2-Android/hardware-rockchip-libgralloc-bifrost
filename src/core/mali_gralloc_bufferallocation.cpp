@@ -140,13 +140,18 @@ static bool should_satisfy_implicit_requirement_for_rk_gralloc_allocate(uint64_t
 	GRALLOC_UNUSED(producer_usage);
 	GRALLOC_UNUSED(consumer_usage);
 
-#if 0
-	if ( HAL_PIXEL_FORMAT_YCrCb_NV12 == req_format )
-#else
-	if ( MALI_GRALLOC_FORMAT_INTERNAL_NV12 == alloc_format )
-#endif
+	/* 若 VPU 是 producer 或 consumer, 则... */
+	if ( (GRALLOC_USAGE_HW_VIDEO_ENCODER == (GRALLOC_USAGE_HW_VIDEO_ENCODER | consumer_usage) )
+		|| (GRALLOC_USAGE_DECODER == (GRALLOC_USAGE_DECODER | producer_usage) ) )
 	{
-		return true;
+#if 0
+		if ( HAL_PIXEL_FORMAT_YCrCb_NV12 == req_format )
+#else
+		if ( MALI_GRALLOC_FORMAT_INTERNAL_NV12 == alloc_format )
+#endif
+		{
+			return true;
+		}
 	}
 
 	return false;

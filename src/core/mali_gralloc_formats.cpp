@@ -1501,25 +1501,33 @@ typedef enum rk_board_platform_t
 	RK_BOARD_PLATFORM_UNKNOWN,
 } rk_board_platform_t;
 
+static rk_board_platform_t s_platform = RK_BOARD_PLATFORM_UNKNOWN;
+
 static rk_board_platform_t get_rk_board_platform()
 {
-	char value[PROPERTY_VALUE_MAX];
+	/* 若 's_platform' 尚未初始化, 则... */
+	if ( RK_BOARD_PLATFORM_UNKNOWN == s_platform )
+	{
+		char value[PROPERTY_VALUE_MAX];
 
-	property_get("ro.board.platform", value, "0");
+		property_get("ro.board.platform", value, "0");
 
-	if (0 == strcmp("rk3326", value) )
-	{
-		return RK3326;
+		if (0 == strcmp("rk3326", value) )
+		{
+			s_platform = RK3326;
+		}
+		else if (0 == strcmp("rk356x", value) )
+		{
+			s_platform = RK356X;
+		}
+		else
+		{
+			LOG_ALWAYS_FATAL("unexpected 'value' : %s", value);
+			return RK_BOARD_PLATFORM_UNKNOWN;
+		}
 	}
-	else if (0 == strcmp("rk356x", value) )
-	{
-		return RK356X;
-	}
-	else
-	{
-		LOG_ALWAYS_FATAL("unexpected 'value' : %s", value);
-		return RK_BOARD_PLATFORM_UNKNOWN;
-	}
+
+	return s_platform;
 }
 
 static bool is_rk_ext_hal_format(const uint64_t hal_format)

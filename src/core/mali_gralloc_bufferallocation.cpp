@@ -147,7 +147,8 @@ static bool should_satisfy_implicit_requirement_for_rk_gralloc_allocate(uint64_t
 #if 0
 		if ( HAL_PIXEL_FORMAT_YCrCb_NV12 == req_format )
 #else
-		if ( MALI_GRALLOC_FORMAT_INTERNAL_NV12 == alloc_format )
+		if ( MALI_GRALLOC_FORMAT_INTERNAL_NV12 == alloc_format
+			|| MALI_GRALLOC_FORMAT_INTERNAL_NV16 == alloc_format )
 #endif
 		{
 			return true;
@@ -218,6 +219,36 @@ static void calc_layout_info_satisfying_implicit_requirement_for_rk_gralloc_allo
 			 *		    2 * w * h 一定够.
 			 */
 			*size = 2 * width * height;
+
+			break;
+		}
+		case MALI_GRALLOC_FORMAT_INTERNAL_NV16:
+		{
+			if ( width % 2 != 0 )
+			{
+				W("unexpected width(%d).", width);
+			}
+
+			/*
+			 * .KP : 陈锦森 : 对 decoder 要求的 HAL_PIXEL_FORMAT_YCbCr_422_SP 格式的 buffer,
+			 *		  和 NV12 一样 要 将传入的 width 解析为 byte_stride.
+			 * 对 arm_gralloc, HAL_PIXEL_FORMAT_YCbCr_422_SP 就是 MALI_GRALLOC_FORMAT_INTERNAL_NV16.
+			 */
+			*pixel_stride = (int)width;
+
+			plane_info_t* y_plane_info = &(plane_info[0]);
+			y_plane_info->offset = 0;
+			y_plane_info->alloc_width = *pixel_stride;
+			y_plane_info->byte_stride = (y_plane_info->alloc_width * format.bpp[0]) / 8;
+			y_plane_info->alloc_height = height;
+
+			plane_info_t* uv_plane_info = &(plane_info[1]);
+			uv_plane_info->offset = y_plane_info->byte_stride * y_plane_info->alloc_height;
+			uv_plane_info->alloc_width = width / format.hsub;
+			uv_plane_info->byte_stride = (uv_plane_info->alloc_width * format.bpp[1]) / 8;
+			uv_plane_info->alloc_height = height / format.vsub;
+
+			*size = 2.5 * width * height; // 根据 陈锦森的 要求
 
 			break;
 		}
@@ -882,16 +913,34 @@ int mali_gralloc_derive_format_and_size(buffer_descriptor_t * const bufDescripto
 											 &size_rk,
 											 plane_info_rk);
 
-		/* 若 pixel stride 不同, 则 将 'bufDescriptor->pixel_stride' 调整为 'pixel_stride_rk'. */
-		if ( pixel_stride_rk != bufDescriptor->pixel_stride )
+		if ( 0 != bufDescriptor->pixel_stride )
 		{
-			W("'pixel_stride_rk'(%d) is different from 'bufDescriptor->pixel_stride'(%d); "
-					"force to use pixel_stride_rk and plane_info_rk.",
-			  pixel_stride_rk,
-			  bufDescriptor->pixel_stride);
-			bufDescriptor->pixel_stride = pixel_stride_rk;
+			/* 若 pixel stride 不同, 则 将 'bufDescriptor->pixel_stride' 调整为 'pixel_stride_rk'. */
+			if ( pixel_stride_rk != bufDescriptor->pixel_stride )
+			{
+				W("'pixel_stride_rk'(%d) is different from 'bufDescriptor->pixel_stride'(%d); "
+						"force to use pixel_stride_rk and plane_info_rk.",
+				  pixel_stride_rk,
+				  bufDescriptor->pixel_stride);
+				bufDescriptor->pixel_stride = pixel_stride_rk;
 
-			memcpy(bufDescriptor->plane_info, plane_info_rk, sizeof(plane_info_rk) );
+				memcpy(bufDescriptor->plane_info, plane_info_rk, sizeof(plane_info_rk) );
+			}
+		}
+		else
+		{
+			uint32_t byte_stride_rk = plane_info_rk[0].byte_stride; // RK 计算得到的 byte_stride of plane_0
+			uint32_t byte_stride_arm = bufDescriptor->plane_info[0].byte_stride;
+
+			if ( byte_stride_rk != byte_stride_arm )
+			{
+				W("'byte_stride_rk'(%d) is different from 'byte_stride_arm'(%d); "
+						"force to use plane_info_rk.",
+				  byte_stride_rk,
+				  byte_stride_arm);
+
+				memcpy(bufDescriptor->plane_info, plane_info_rk, sizeof(plane_info_rk) );
+			}
 		}
 
 		if ( size_rk > bufDescriptor->size )

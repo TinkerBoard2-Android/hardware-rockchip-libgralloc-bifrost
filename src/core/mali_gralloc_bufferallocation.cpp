@@ -124,6 +124,43 @@ static rect_t get_afbc_sb_size(alloc_type_t alloc_type, const uint8_t plane)
 	}
 }
 
+static void adjust_rk_video_buffer_size(buffer_descriptor_t* const bufDescriptor)
+{
+	const uint32_t width = bufDescriptor->width;
+	const uint32_t height = bufDescriptor->height;
+	const uint32_t base_format = bufDescriptor->alloc_format & MALI_GRALLOC_INTFMT_FMT_MASK;
+	size_t size_needed_by_rk_video = 0;
+
+	switch ( base_format )
+	{
+		case MALI_GRALLOC_FORMAT_INTERNAL_NV12:
+		{
+			/*
+			 * .KP : from CSY : video_decoder 需要的 NV12 buffer 中除了 YUV 数据还有其他 metadata, 要更多的空间.
+			 *		    2 * w * h 一定够.
+			 */
+			size_needed_by_rk_video = 2 * width * height;
+			break;
+		}
+		case MALI_GRALLOC_FORMAT_INTERNAL_NV16:
+		{
+			size_needed_by_rk_video = 2.5 * width * height; // 根据 陈锦森的 要求
+			break;
+		}
+		default:
+			return;
+	}
+
+	if ( size_needed_by_rk_video > bufDescriptor->size )
+	{
+		I("to enlarge size of rk_video_buffer with base_format(0x%x) from %zd to %zd",
+		  base_format,
+		  bufDescriptor->size,
+		  size_needed_by_rk_video);
+		bufDescriptor->size = size_needed_by_rk_video;
+	}
+}
+
 /*
  * 返回 "当前 alloc 操作 是否 应该 满足 implicit_requirement_for_rk_gralloc_allocate".
  */
@@ -139,13 +176,18 @@ static bool should_satisfy_implicit_requirement_for_rk_gralloc_allocate(uint64_t
 #endif
 	GRALLOC_UNUSED(producer_usage);
 	GRALLOC_UNUSED(consumer_usage);
+	const uint64_t base_format = alloc_format & MALI_GRALLOC_INTFMT_FMT_MASK;
 
 	{
 #if 0
 		if ( HAL_PIXEL_FORMAT_YCrCb_NV12 == req_format )
 #else
-		if ( MALI_GRALLOC_FORMAT_INTERNAL_NV12 == alloc_format
-			|| MALI_GRALLOC_FORMAT_INTERNAL_NV16 == alloc_format )
+		if ( MALI_GRALLOC_FORMAT_INTERNAL_NV12 == base_format
+			|| MALI_GRALLOC_FORMAT_INTERNAL_NV16 == base_format
+			|| MALI_GRALLOC_FORMAT_INTERNAL_YUV420_8BIT_I == base_format
+			|| MALI_GRALLOC_FORMAT_INTERNAL_YUV420_10BIT_I == base_format
+			|| MALI_GRALLOC_FORMAT_INTERNAL_YUV422_8BIT == base_format
+			|| MALI_GRALLOC_FORMAT_INTERNAL_Y210 == base_format )
 #endif
 		{
 			return true;
@@ -887,6 +929,50 @@ int mali_gralloc_derive_format_and_size(buffer_descriptor_t * const bufDescripto
 	/*-------------------------------------------------------*/
 	/* <为满足 implicit_requirement_for_rk_gralloc_alloc_interface_from_rk_video_decoder 的特殊处理.> */
 
+#if 0	/* "0" : 对 NV12, camera 目前也要求 implicit_requirement_for_rk_gralloc_alloc_interface_from_rk_video_decoder,
+	 *	 所以这里不再要求 buffer 必须和 VPU 有关.
+	 */
+
+	/* 若 VPU 将访问当前 buffer, 则 ... */
+	if ( (GRALLOC_USAGE_HW_VIDEO_ENCODER == (GRALLOC_USAGE_HW_VIDEO_ENCODER | bufDescriptor->consumer_usage) )
+		|| (GRALLOC_USAGE_DECODER == (GRALLOC_USAGE_DECODER | bufDescriptor->producer_usage) ) )
+#endif
+	{
+		const uint32_t base_format = bufDescriptor->alloc_format & MALI_GRALLOC_INTFMT_FMT_MASK;
+
+		/* 若 base_format "是" 被 rk_video 使用的格式, 则 ... */
+		if ( is_base_format_used_by_rk_video(base_format) )
+		{
+			uint8_t bpp = 0;	// bits_per_pixel of plane_0
+			const int pixel_stride_asked_by_rk_video = bufDescriptor->width;
+			int pixel_stride_calculated_by_arm_gralloc = 0;
+
+			/* 若当前 是 AFBC 格式, 则 ... */
+			if ( bufDescriptor->alloc_format & MALI_GRALLOC_INTFMT_AFBC_BASIC )
+			{
+				bpp = formats[format_idx].bpp_afbc[0];
+			}
+			else
+			{
+				bpp = formats[format_idx].bpp[0];
+			}
+
+			pixel_stride_calculated_by_arm_gralloc = bufDescriptor->plane_info[0].byte_stride * 8 / bpp;
+
+			if ( pixel_stride_asked_by_rk_video != pixel_stride_calculated_by_arm_gralloc )
+			{
+				W("pixel_stride_asked_by_rk_video(%d) and pixel_stride_calculated_by_arm_gralloc(%d) are different.",
+						  pixel_stride_asked_by_rk_video,
+						  pixel_stride_calculated_by_arm_gralloc);
+
+			}
+
+			/* 对某些 格式的 rk_video_buffer 的 size 做必要调整. */
+			adjust_rk_video_buffer_size(bufDescriptor);
+		}
+	}
+
+#if 0
 	int pixel_stride_rk;	// pixel stride to satisfy implicit_requirement_for_rk_gralloc_allocate,
 				// 即 rk_video_decoder 预期的值.
 	size_t size_rk;
@@ -951,6 +1037,7 @@ int mali_gralloc_derive_format_and_size(buffer_descriptor_t * const bufDescripto
 			bufDescriptor->size = size_rk;
 		}
 	}
+#endif
 
 	/*-------------------------------------------------------*/
 

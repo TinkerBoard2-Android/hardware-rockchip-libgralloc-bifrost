@@ -419,6 +419,14 @@ void mali_gralloc_adjust_dimensions(const uint64_t alloc_format,
 		}
 	}
 
+	/* 若当前 buffer 是 AFBC 格式, 且 VOP 是 consumer, 则 ... */
+	if ( (alloc_format & MALI_GRALLOC_INTFMT_AFBC_BASIC)
+		&& (consumers & MALI_GRALLOC_CONSUMER_DPU) )
+	{
+		*width = GRALLOC_ALIGN(*width, AFBC_BUFFERS_HORIZONTAL_PIXEL_STRIDE_ALIGNMENT_REQUIRED_BY_356X_VOP);
+		*height = GRALLOC_ALIGN(*height, AFBC_BUFFERS_VERTICAL_PIXEL_STRIDE_ALIGNMENT_REQUIRED_BY_356X_VOP);
+	}
+
 	/*-------------------------------------------------------*/
 
 	/*

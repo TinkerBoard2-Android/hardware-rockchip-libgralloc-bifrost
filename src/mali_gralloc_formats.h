@@ -365,6 +365,9 @@ uint64_t mali_gralloc_select_format(const uint64_t req_format,
                                     uint64_t * const internal_format);
 
 bool is_subsampled_yuv(const uint32_t base_format);
+
+bool is_base_format_used_by_rk_video(const uint32_t base_format);
+
 #endif
 
 #endif /* MALI_GRALLOC_FORMATS_H_ */

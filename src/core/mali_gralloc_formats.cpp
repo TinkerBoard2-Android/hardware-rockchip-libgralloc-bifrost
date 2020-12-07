@@ -370,6 +370,8 @@ out:
 }
 #endif /* end of legacy */
 
+#define AFBC_BUFFERS_HORIZONTAL_PIXEL_STRIDE_ALIGNMENT_REQUIRED_BY_356X_VOP	(64)
+#define AFBC_BUFFERS_VERTICAL_PIXEL_STRIDE_ALIGNMENT_REQUIRED_BY_356X_VOP	(16)
 
 /*
  * Update buffer dimensions for producer/consumer constraints. This process is
@@ -392,6 +394,32 @@ void mali_gralloc_adjust_dimensions(const uint64_t alloc_format,
 	/* Determine producers and consumers. */
 	const uint16_t producers = get_producers(usage);
 	const uint16_t consumers = get_consumers(usage);
+
+	/*-------------------------------------------------------*/
+
+	/* 若当前 buffer 是 AFBC 格式, 且 VOP 是 consumer, 且 VPU 是 producer, 则 ... */
+	if ( (alloc_format & MALI_GRALLOC_INTFMT_AFBC_BASIC)
+		&& (consumers & MALI_GRALLOC_CONSUMER_DPU)	// "DPU" : Display processor, 就是 RK 的 VOP.
+		&& (producers & MALI_GRALLOC_PRODUCER_VPU) )
+	{
+		const uint32_t base_format = alloc_format & MALI_GRALLOC_INTFMT_FMT_MASK;
+
+		/* 若 base_format "是" 被 的 rk_video 使用 格式, 则 ... */
+		if ( is_base_format_used_by_rk_video(base_format) )
+		{
+			const int pixel_stride = *width; // pixel_stride_ask_by_rk_video
+
+			/* 若 'pixel_stride' "没有" 按照 VOP 的要求对齐. */
+			if ( pixel_stride % AFBC_BUFFERS_HORIZONTAL_PIXEL_STRIDE_ALIGNMENT_REQUIRED_BY_356X_VOP != 0 )
+			{
+				LOG_ALWAYS_FATAL("pixel_stride_ask_by_rk_video(%d) is not %d aligned required by 356x VOP",
+						 pixel_stride,
+						 AFBC_BUFFERS_HORIZONTAL_PIXEL_STRIDE_ALIGNMENT_REQUIRED_BY_356X_VOP);
+			}
+		}
+	}
+
+	/*-------------------------------------------------------*/
 
 	/*
 	 * Video producer requires additional height padding of AFBC buffers (whole
@@ -522,6 +550,24 @@ bool is_subsampled_yuv(const uint32_t base_format)
 	return false;
 }
 
+bool is_base_format_used_by_rk_video(const uint32_t base_format)
+{
+	if ( MALI_GRALLOC_FORMAT_INTERNAL_NV12 == base_format
+		|| MALI_GRALLOC_FORMAT_INTERNAL_NV16 == base_format
+		|| MALI_GRALLOC_FORMAT_INTERNAL_YUV420_8BIT_I == base_format
+		|| MALI_GRALLOC_FORMAT_INTERNAL_YUV420_10BIT_I == base_format
+		|| MALI_GRALLOC_FORMAT_INTERNAL_YUV422_8BIT == base_format
+		|| MALI_GRALLOC_FORMAT_INTERNAL_Y210 == base_format )
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+/*---------------------------------------------------------------------------*/
 
 /*
  * Determines whether multi-plane AFBC (requires specific IP capabiltiies) is

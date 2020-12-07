@@ -1590,6 +1590,18 @@ static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 		I("to use NV12 for  %" PRIu64, req_format);
 		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_NV12;
 	}
+	else if ( HAL_PIXEL_FORMAT_YUV420_8BIT_I == req_format )
+	{
+		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_YUV420_8BIT_I;
+	}
+	else if ( HAL_PIXEL_FORMAT_YUV420_10BIT_I == req_format )
+	{
+		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_YUV420_10BIT_I;
+	}
+	else if ( HAL_PIXEL_FORMAT_Y210 == req_format )
+	{
+		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_Y210;
+	}
 
 	/*-------------------------------------------------------*/
 

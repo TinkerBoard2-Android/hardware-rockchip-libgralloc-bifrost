@@ -140,9 +140,6 @@ static bool should_satisfy_implicit_requirement_for_rk_gralloc_allocate(uint64_t
 	GRALLOC_UNUSED(producer_usage);
 	GRALLOC_UNUSED(consumer_usage);
 
-	/* 若 VPU 是 producer 或 consumer, 则... */
-	if ( (GRALLOC_USAGE_HW_VIDEO_ENCODER == (GRALLOC_USAGE_HW_VIDEO_ENCODER | consumer_usage) )
-		|| (GRALLOC_USAGE_DECODER == (GRALLOC_USAGE_DECODER | producer_usage) ) )
 	{
 #if 0
 		if ( HAL_PIXEL_FORMAT_YCrCb_NV12 == req_format )
@@ -903,6 +900,8 @@ int mali_gralloc_derive_format_and_size(buffer_descriptor_t * const bufDescripto
 									 bufDescriptor->producer_usage,
 									 bufDescriptor->consumer_usage) )
 	{
+		I("current buffer should satisfy implicit requirement for rk gralloc allocate.");
+
 		/* 计算满足 implicit_requirement_for_rk_gralloc_allocate 的 pixel_stride, size, plane_info 等信息. */
 		calc_layout_info_satisfying_implicit_requirement_for_rk_gralloc_allocate(bufDescriptor->width,
 											 bufDescriptor->height,

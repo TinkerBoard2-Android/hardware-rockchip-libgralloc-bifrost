@@ -429,6 +429,7 @@ void mali_gralloc_adjust_dimensions(const uint64_t alloc_format,
 
 	/*-------------------------------------------------------*/
 
+#if 0	// 这段逻辑不 适用于 RK 的 VPU.
 	/*
 	 * Video producer requires additional height padding of AFBC buffers (whole
 	 * rows of 16x16 superblocks). Cropping will be applied to internal
@@ -447,6 +448,7 @@ void mali_gralloc_adjust_dimensions(const uint64_t alloc_format,
 			}
 		}
 	}
+#endif
 
 	if (producers & MALI_GRALLOC_PRODUCER_GPU)
 	{

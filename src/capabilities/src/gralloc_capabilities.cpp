@@ -79,7 +79,7 @@ static bool get_block_capabilities(const char *name, mali_gralloc_format_caps *b
 	}
 	else
 	{
-		MALI_GRALLOC_LOGW("Unable to dlopen %s shared object, error = %s", name, dlerror());
+		// MALI_GRALLOC_LOGW("Unable to dlopen %s shared object, error = %s", name, dlerror());
 	}
 
 	return rval;

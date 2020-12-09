@@ -53,7 +53,11 @@ namespace legacy
 
 // This value is platform specific and should be set according to hardware YUV planes restrictions.
 // Please note that EGL winsys platform config file needs to use the same value when importing buffers.
+#if 0
 #define YUV_MALI_PLANE_ALIGN 128
+#else
+#define YUV_MALI_PLANE_ALIGN 16
+#endif
 
 // Default YUV stride aligment in Android
 #define YUV_ANDROID_PLANE_ALIGN 16

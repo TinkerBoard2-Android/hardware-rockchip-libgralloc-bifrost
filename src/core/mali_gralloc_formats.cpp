@@ -1653,10 +1653,12 @@ static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 	}
 	else if ( HAL_PIXEL_FORMAT_YUV420_8BIT_I == req_format )
 	{
+		I("to use MALI_GRALLOC_FORMAT_INTERNAL_YUV420_8BIT_I as internal_format for HAL_PIXEL_FORMAT_YUV420_8BIT_I.");
 		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_YUV420_8BIT_I;
 	}
 	else if ( HAL_PIXEL_FORMAT_YUV420_10BIT_I == req_format )
 	{
+		I("to use MALI_GRALLOC_FORMAT_INTERNAL_YUV420_10BIT_I as internal_format for HAL_PIXEL_FORMAT_YUV420_10BIT_I.");
 		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_YUV420_10BIT_I;
 	}
 	else if ( HAL_PIXEL_FORMAT_YCbCr_422_I == req_format )
@@ -1666,6 +1668,7 @@ static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 	}
 	else if ( HAL_PIXEL_FORMAT_Y210 == req_format )
 	{
+		I("to use MALI_GRALLOC_FORMAT_INTERNAL_Y210 as internal_format for HAL_PIXEL_FORMAT_Y210.");
 		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_Y210;
 	}
 

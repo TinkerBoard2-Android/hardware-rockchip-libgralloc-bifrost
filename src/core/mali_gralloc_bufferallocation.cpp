@@ -556,7 +556,11 @@ static void calc_allocation_size(const int width,
 			uint16_t hw_align = 0;
 			if (has_hw_usage)
 			{
+#if 0
 				hw_align = format.is_yuv ? 128 : 64;
+#else
+				hw_align = 16 * format.bpp[plane] / 8;	// "16" : 预期和 YUV_MALI_PLANE_ALIGN 一致.
+#endif
 			}
 
 			uint32_t cpu_align = 0;

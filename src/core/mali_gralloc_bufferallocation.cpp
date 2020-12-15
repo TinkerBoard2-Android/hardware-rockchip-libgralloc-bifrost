@@ -559,7 +559,15 @@ static void calc_allocation_size(const int width,
 #if 0
 				hw_align = format.is_yuv ? 128 : 64;
 #else
-				hw_align = 16 * format.bpp[plane] / 8;	// "16" : 预期和 YUV_MALI_PLANE_ALIGN 一致.
+				if ( is_base_format_used_by_rk_video(format.id) )
+				{
+					hw_align = 1;	// 假定 client(rk_video_decoder 等) 通过 width 传入的 pixel_stride 是合理的.
+				}
+				else
+				{
+					hw_align = 64;	// "64" : 为正确渲染鼠标图标, 实测确定 "byte_stride 必须至少 64 对齐".
+							//	  预期是 GPU 的要求.
+				}
 #endif
 			}
 

@@ -412,7 +412,7 @@ void mali_gralloc_adjust_dimensions(const uint64_t alloc_format,
 			/* 若 'pixel_stride' "没有" 按照 VOP 的要求对齐. */
 			if ( pixel_stride % AFBC_BUFFERS_HORIZONTAL_PIXEL_STRIDE_ALIGNMENT_REQUIRED_BY_356X_VOP != 0 )
 			{
-				LOG_ALWAYS_FATAL("pixel_stride_ask_by_rk_video(%d) is not %d aligned required by 356x VOP",
+				W("pixel_stride_ask_by_rk_video(%d) is not %d aligned required by 356x VOP",
 						 pixel_stride,
 						 AFBC_BUFFERS_HORIZONTAL_PIXEL_STRIDE_ALIGNMENT_REQUIRED_BY_356X_VOP);
 			}

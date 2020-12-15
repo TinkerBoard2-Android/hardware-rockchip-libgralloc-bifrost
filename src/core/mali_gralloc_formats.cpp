@@ -1671,6 +1671,11 @@ static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 		I("to use MALI_GRALLOC_FORMAT_INTERNAL_Y210 as internal_format for HAL_PIXEL_FORMAT_Y210.");
 		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_Y210;
 	}
+	else if ( req_format == HAL_PIXEL_FORMAT_YCRCB_420_SP)
+	{
+		I("to use NV21 for  %" PRIu64, req_format)
+		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_NV21;
+	}
 
 	/*-------------------------------------------------------*/
 

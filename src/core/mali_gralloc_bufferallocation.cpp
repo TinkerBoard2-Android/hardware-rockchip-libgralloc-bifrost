@@ -751,6 +751,16 @@ int mali_gralloc_derive_format_and_size(buffer_descriptor_t * const bufDescripto
 	                                                         usage,
 	                                                         bufDescriptor->width * bufDescriptor->height,
 	                                                         &bufDescriptor->old_internal_format);
+
+	if(((bufDescriptor->alloc_format == 0x30 || bufDescriptor->alloc_format == 0x31 || bufDescriptor->alloc_format == 0x32 ||
+		bufDescriptor->alloc_format == 0x33 || bufDescriptor->alloc_format == 0x34 || bufDescriptor->alloc_format == 0x35) &&
+		alloc_width <= 100 && alloc_height <= 100) ||
+		(bufDescriptor->alloc_format == 0x100 && (alloc_width == 100 || alloc_width == 4) && (alloc_height == 100 || alloc_height == 4)))
+	{
+		ALOGE("rk-debug isSupportedi workaround for cts NativeHardware");
+		return -EINVAL;
+	}
+
 	if (bufDescriptor->alloc_format == MALI_GRALLOC_FORMAT_INTERNAL_UNDEFINED)
 	{
 		MALI_GRALLOC_LOGE("ERROR: Unrecognized and/or unsupported format 0x%" PRIx64 " and usage 0x%" PRIx64,

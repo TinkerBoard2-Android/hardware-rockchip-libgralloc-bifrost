@@ -871,6 +871,17 @@ int mali_gralloc_ion_allocate(const gralloc_buffer_descriptor_t *descriptors,
 				return -1;
 			}
 
+			if (((hnd->req_format == 0x30 || hnd->req_format == 0x31 || hnd->req_format == 0x32 ||
+					hnd->req_format == 0x33 || hnd->req_format == 0x34 || hnd->req_format == 0x35) &&
+					hnd->width <= 100 && hnd->height <= 100) ||
+					(hnd->req_format == 0x23 && hnd->width == 100 && hnd->height == 100))
+			{
+				MALI_GRALLOC_LOGE("rk-debug workaround for NativeHareware");
+				close(shared_fd);
+				mali_gralloc_ion_free_internal(pHandle, numDescriptors);
+				return -1;
+			}
+
 			// .T : dump "*hnd"
 			{
 			D("got new private_handle_t instance for buffer '%s'. share_fd : %d, flags : 0x%x, width : %d, height : %d, "

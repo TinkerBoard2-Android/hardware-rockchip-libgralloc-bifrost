@@ -1600,11 +1600,11 @@ static bool is_no_afbc_for_sf_client_layer_required_via_prop()
 	return (0 == strcmp("1", value) );
 }
 
-static bool should_disable_afbc_in_fb_target_layer()
+static bool is_no_afbc_for_fb_target_layer_required_via_prop()
 {
 	char value[PROPERTY_VALUE_MAX];
 
-	property_get("vendor.gralloc.disable_afbc", value, "0");
+	property_get("vendor.gralloc.no_afbc_for_fb_target_layer", value, "0");
 
 	return (0 == strcmp("1", value) );
 }
@@ -1694,7 +1694,7 @@ static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 	/* 若当前 buffer "是" 用于 fb_target_layer, 则... */
 	if ( GRALLOC_USAGE_HW_FB == (usage & GRALLOC_USAGE_HW_FB) )
 	{
-		if ( !should_disable_afbc_in_fb_target_layer() )
+		if ( !is_no_afbc_for_fb_target_layer_required_via_prop() )
 		{
 			rk_board_platform_t platform = get_rk_board_platform();
 			switch ( platform )

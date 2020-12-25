@@ -16,6 +16,9 @@
  * limitations under the License.
  */
 
+#define ENABLE_DEBUG_LOG
+#include "../custom_log.h"
+
 /* Legacy shared attribute region is deprecated from Android 11.
  * Use the new shared metadata region defined for Gralloc 4.
  */
@@ -125,6 +128,33 @@ void allocate(const buffer_descriptor_t &bufferDescriptor, uint32_t count, IAllo
 			 */
 			munmap(hnd->attr_base, hnd->attr_size);
 			hnd->attr_base = MAP_FAILED;
+
+			buffer_descriptor_t * const bufDescriptor = (buffer_descriptor_t *)(grallocBufferDescriptor[0]);
+			D("got new private_handle_t instance @%p for buffer '%s'. share_fd : %d, share_attr_fd : %d, "
+				"flags : 0x%x, width : %d, height : %d, "
+				"req_format : 0x%x, producer_usage : 0x%" PRIx64 ", consumer_usage : 0x%" PRIx64 ", "
+				"internal_format : 0x%" PRIx64 ", stride : %d, byte_stride : %d, "
+				"internalWidth : %d, internalHeight : %d, "
+				"alloc_format : 0x%" PRIx64 ", size : %d, layer_count : %u, backing_store_size : %d, "
+				"allocating_pid : %d, ref_count : %d, yuv_info : %d",
+				hnd, (bufDescriptor->name).c_str() == nullptr ? "unset" : (bufDescriptor->name).c_str(),
+			  hnd->share_fd, hnd->share_attr_fd,
+			  hnd->flags, hnd->width, hnd->height,
+			  hnd->req_format, hnd->producer_usage, hnd->consumer_usage,
+			  hnd->internal_format, hnd->stride, hnd->byte_stride,
+			  hnd->internalWidth, hnd->internalHeight,
+			  hnd->alloc_format, hnd->size, hnd->layer_count, hnd->backing_store_size,
+			  hnd->allocating_pid, hnd->ref_count, hnd->yuv_info);
+			ALOGD("plane_info[0]: offset : %u, byte_stride : %u, alloc_width : %u, alloc_height : %u",
+					(hnd->plane_info)[0].offset,
+					(hnd->plane_info)[0].byte_stride,
+					(hnd->plane_info)[0].alloc_width,
+					(hnd->plane_info)[0].alloc_height);
+			ALOGD("plane_info[1]: offset : %u, byte_stride : %u, alloc_width : %u, alloc_height : %u",
+					(hnd->plane_info)[1].offset,
+					(hnd->plane_info)[1].byte_stride,
+					(hnd->plane_info)[1].alloc_width,
+					(hnd->plane_info)[1].alloc_height);
 		}
 
 		int tmpStride = 0;

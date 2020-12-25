@@ -511,6 +511,7 @@ static void calc_allocation_size(const int width,
                                  const format_info_t format,
                                  const bool has_cpu_usage,
                                  const bool has_hw_usage,
+				 const bool is_stride_specified,
                                  int * const pixel_stride,
                                  size_t * const size,
                                  plane_info_t plane_info[MAX_PLANES])
@@ -559,14 +560,16 @@ static void calc_allocation_size(const int width,
 #if 0
 				hw_align = format.is_yuv ? 128 : 64;
 #else
-				if ( is_base_format_used_by_rk_video(format.id) )
+				if ( is_base_format_used_by_rk_video(format.id) && is_stride_specified )
 				{
-					hw_align = 1;	// 假定 client(rk_video_decoder 等) 通过 width 传入的 pixel_stride 是合理的.
+					// 此时, 认为 client(rk_video_decoder 等) 通过 width 传入的 pixel_stride 是合理的,
+					// 可满足 GPU 等其他组件对 stride 的要求.
+					// 即 这里不需要再做更多的对齐处理.
+					hw_align = 1;
 				}
 				else
 				{
-					hw_align = 64;	// "64" : 为正确渲染鼠标图标, 实测确定 "byte_stride 必须至少 64 对齐".
-							//	  预期是 GPU 的要求.
+					hw_align = format.is_yuv ? 128 : 64;
 				}
 #endif
 			}
@@ -807,6 +810,7 @@ int mali_gralloc_derive_format_and_size(buffer_descriptor_t * const bufDescripto
 	                     formats[format_idx],
 	                     usage & (GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK),
 	                     usage & ~(GRALLOC_USAGE_PRIVATE_MASK | GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK),
+			     usage & RK_GRALLOC_USAGE_SPECIFY_STRIDE, // 'is_stride_specified'
 	                     &bufDescriptor->pixel_stride,
 	                     &bufDescriptor->size,
 	                     bufDescriptor->plane_info);
@@ -824,9 +828,10 @@ int mali_gralloc_derive_format_and_size(buffer_descriptor_t * const bufDescripto
 #endif
 	{
 		const uint32_t base_format = bufDescriptor->alloc_format & MALI_GRALLOC_INTFMT_FMT_MASK;
+		const bool is_stride_specified = usage & RK_GRALLOC_USAGE_SPECIFY_STRIDE;
 
-		/* 若 base_format "是" 被 rk_video 使用的格式, 则 ... */
-		if ( is_base_format_used_by_rk_video(base_format) )
+		/* 若 base_format "是" 被 rk_video 使用的格式, 且 rk client 要求指定 stride, 则 ... */
+		if ( is_base_format_used_by_rk_video(base_format) && is_stride_specified )
 		{
 			uint8_t bpp = 0;	// bits_per_pixel of plane_0
 			const int pixel_stride_asked_by_rk_video = bufDescriptor->width;

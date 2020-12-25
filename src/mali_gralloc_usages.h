@@ -184,6 +184,12 @@ namespace hidl_common = android::hardware::graphics::common::V1_1;
 
 typedef enum
 {
+
+	/* 表征 "当前 调用 alloc() 的 client 通过 width 指定了其预期的 buffer stride",
+	 * 即要求 gralloc 遵循 rk_implicit_alloc_semantic (即 满足 implicit_requirement_for_rk_gralloc_allocate).
+	 */
+	RK_GRALLOC_USAGE_SPECIFY_STRIDE = GRALLOC_USAGE_PRIVATE_2,
+
 	/* See comment for Gralloc 1.0, above. */
 	MALI_GRALLOC_USAGE_FRONTBUFFER = GRALLOC_USAGE_PRIVATE_0,
 

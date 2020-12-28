@@ -876,7 +876,8 @@ int mali_gralloc_ion_allocate(const gralloc_buffer_descriptor_t *descriptors,
 					hnd->width <= 100 && hnd->height <= 100) ||
 					(hnd->req_format == 0x23 && hnd->width == 100 && hnd->height == 100))
 			{
-				MALI_GRALLOC_LOGE("rk-debug workaround for NativeHareware");
+				ALOGE("rk-debug workaround for NativeHareware format = %x producer_usage : 0x%" PRIx64 ", consumer_usage : 0x%" PRIx64,
+					hnd->req_format, hnd->producer_usage, hnd->consumer_usage);
 				close(shared_fd);
 				mali_gralloc_ion_free_internal(pHandle, numDescriptors);
 				return -1;

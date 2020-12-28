@@ -754,10 +754,12 @@ int mali_gralloc_derive_format_and_size(buffer_descriptor_t * const bufDescripto
 
 	if(((bufDescriptor->alloc_format == 0x30 || bufDescriptor->alloc_format == 0x31 || bufDescriptor->alloc_format == 0x32 ||
 		bufDescriptor->alloc_format == 0x33 || bufDescriptor->alloc_format == 0x34 || bufDescriptor->alloc_format == 0x35) &&
-		alloc_width <= 100 && alloc_height <= 100) ||
-		(bufDescriptor->alloc_format == 0x100 && (alloc_width == 100 || alloc_width == 4) && (alloc_height == 100 || alloc_height == 4)))
+		(usage == 0x300 || usage == 0x200) && alloc_width <= 100 && alloc_height <= 100) ||
+		(bufDescriptor->alloc_format == 0x100 && (alloc_width == 100 || alloc_width == 4) && (alloc_height == 100 || alloc_height == 4) &&
+		(usage == 0x300 || usage == 0x200)))
 	{
-		ALOGE("rk-debug isSupportedi workaround for cts NativeHardware");
+		ALOGE("rk-debug isSupportedi workaround for cts NativeHardware format = 0x%" PRIx64 " and usage 0x%" PRIx64,
+				bufDescriptor->alloc_format, usage);
 		return -EINVAL;
 	}
 

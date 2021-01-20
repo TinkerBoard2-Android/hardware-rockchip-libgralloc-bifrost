@@ -1764,6 +1764,7 @@ static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 						   则... */
 						if ( internal_format != MALI_GRALLOC_FORMAT_INTERNAL_NV12
 							&& internal_format != MALI_GRALLOC_FORMAT_INTERNAL_P010
+							&& internal_format != MALI_GRALLOC_FORMAT_INTERNAL_RGBA_16161616
 							&& internal_format != MALI_GRALLOC_FORMAT_INTERNAL_NV16 )
 						{
 							/* 强制将 'internal_format' 设置为对应的 AFBC 格式. */

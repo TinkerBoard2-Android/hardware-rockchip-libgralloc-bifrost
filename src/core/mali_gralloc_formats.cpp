@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-#define ENABLE_DEBUG_LOG
+// #define ENABLE_DEBUG_LOG
 #include "../custom_log.h"
 
 #include <string.h>
@@ -1620,12 +1620,12 @@ static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 
 	if ( HAL_PIXEL_FORMAT_YCrCb_NV12 == req_format )
 	{
-		I("to use 'MALI_GRALLOC_FORMAT_INTERNAL_NV12' as internal_format for req_format of 'HAL_PIXEL_FORMAT_YCrCb_NV12'");
+		D("to use 'MALI_GRALLOC_FORMAT_INTERNAL_NV12' as internal_format for req_format of 'HAL_PIXEL_FORMAT_YCrCb_NV12'");
 		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_NV12;
 	}
 	else if ( HAL_PIXEL_FORMAT_YCbCr_422_SP == req_format )
 	{
-		I("to use MALI_GRALLOC_FORMAT_INTERNAL_NV16 as internal_format for HAL_PIXEL_FORMAT_YCbCr_422_SP.");
+		D("to use MALI_GRALLOC_FORMAT_INTERNAL_NV16 as internal_format for HAL_PIXEL_FORMAT_YCbCr_422_SP.");
 		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_NV16;
 	}
 	else if ( HAL_PIXEL_FORMAT_YCrCb_NV12_10 == req_format )
@@ -1638,43 +1638,43 @@ static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 		if ( GRALLOC_USAGE_HW_VIDEO_ENCODER == (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER)
 			|| GRALLOC_USAGE_HW_CAMERA_WRITE == (usage & GRALLOC_USAGE_HW_CAMERA_WRITE) )
 		{
-			I("to select NV12 for HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED for usage : 0x%" PRIx64 ".", usage);
+			D("to select NV12 for HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED for usage : 0x%" PRIx64 ".", usage);
 			internal_format = MALI_GRALLOC_FORMAT_INTERNAL_NV12;
 		}
 		else
 		{
-			I("to select RGBX_8888 for HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED for usage : 0x%" PRIx64 ".", usage);
+			D("to select RGBX_8888 for HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED for usage : 0x%" PRIx64 ".", usage);
 			internal_format = HAL_PIXEL_FORMAT_RGBX_8888;
 		}
 	}
 	else if ( req_format == HAL_PIXEL_FORMAT_YCbCr_420_888 )
 	{
-		I("to use NV12 for  %" PRIu64, req_format);
+		D("to use NV12 for  %" PRIu64, req_format);
 		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_NV12;
 	}
 	else if ( HAL_PIXEL_FORMAT_YUV420_8BIT_I == req_format )
 	{
-		I("to use MALI_GRALLOC_FORMAT_INTERNAL_YUV420_8BIT_I as internal_format for HAL_PIXEL_FORMAT_YUV420_8BIT_I.");
+		D("to use MALI_GRALLOC_FORMAT_INTERNAL_YUV420_8BIT_I as internal_format for HAL_PIXEL_FORMAT_YUV420_8BIT_I.");
 		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_YUV420_8BIT_I;
 	}
 	else if ( HAL_PIXEL_FORMAT_YUV420_10BIT_I == req_format )
 	{
-		I("to use MALI_GRALLOC_FORMAT_INTERNAL_YUV420_10BIT_I as internal_format for HAL_PIXEL_FORMAT_YUV420_10BIT_I.");
+		D("to use MALI_GRALLOC_FORMAT_INTERNAL_YUV420_10BIT_I as internal_format for HAL_PIXEL_FORMAT_YUV420_10BIT_I.");
 		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_YUV420_10BIT_I;
 	}
 	else if ( HAL_PIXEL_FORMAT_YCbCr_422_I == req_format )
 	{
-		I("to use MALI_GRALLOC_FORMAT_INTERNAL_YUV422_8BIT as internal_format for HAL_PIXEL_FORMAT_YCbCr_422_I.");
+		D("to use MALI_GRALLOC_FORMAT_INTERNAL_YUV422_8BIT as internal_format for HAL_PIXEL_FORMAT_YCbCr_422_I.");
 		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_YUV422_8BIT;
 	}
 	else if ( HAL_PIXEL_FORMAT_Y210 == req_format )
 	{
-		I("to use MALI_GRALLOC_FORMAT_INTERNAL_Y210 as internal_format for HAL_PIXEL_FORMAT_Y210.");
+		D("to use MALI_GRALLOC_FORMAT_INTERNAL_Y210 as internal_format for HAL_PIXEL_FORMAT_Y210.");
 		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_Y210;
 	}
 	else if ( req_format == HAL_PIXEL_FORMAT_YCRCB_420_SP)
 	{
-		I("to use NV21 for  %" PRIu64, req_format)
+		D("to use NV21 for  %" PRIu64, req_format);
 		internal_format = MALI_GRALLOC_FORMAT_INTERNAL_NV21;
 	}
 
@@ -1769,7 +1769,7 @@ static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 						{
 							/* 强制将 'internal_format' 设置为对应的 AFBC 格式. */
 							internal_format = internal_format | MALI_GRALLOC_INTFMT_AFBC_BASIC;
-							I("use_afbc_layer: force to set 'internal_format' to 0x%" PRIx64 " for usage '0x%" PRIx64,
+							D("use_afbc_layer: force to set 'internal_format' to 0x%" PRIx64 " for usage '0x%" PRIx64,
 									internal_format, usage);
 						}
 					}

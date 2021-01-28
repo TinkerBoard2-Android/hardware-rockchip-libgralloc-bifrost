@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-#define ENABLE_DEBUG_LOG
+// #define ENABLE_DEBUG_LOG
 #include "../custom_log.h"
 
 #include <inttypes.h>
@@ -153,7 +153,7 @@ static void adjust_rk_video_buffer_size(buffer_descriptor_t* const bufDescriptor
 
 	if ( size_needed_by_rk_video > bufDescriptor->size )
 	{
-		I("to enlarge size of rk_video_buffer with base_format(0x%x) from %zd to %zd",
+		D("to enlarge size of rk_video_buffer with base_format(0x%x) from %zd to %zd",
 		  base_format,
 		  bufDescriptor->size,
 		  size_needed_by_rk_video);

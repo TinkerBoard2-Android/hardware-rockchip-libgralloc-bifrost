@@ -1666,13 +1666,20 @@ static bool is_not_to_use_non_afbc_for_small_buffers_required_via_prop()
  *
  * 用于配合 HWC 的合成策略的实现,
  * 具体判断逻辑 来自 邮件列表 "要求Gralloc针对GraphicBuffer-Size动态开关AFBCD编码标识".
- * 基本的行为是对 size 较小的 buffer 不使用 AFBC 格式.
+ * 基本的行为是对 size 较小的 buffer 不使用 AFBC 格式, 记为 use_non_afbc_for_small_buffers.
  *
  * 预期 本函数 只会在 rk356x 运行时被调用.
  */
-static bool should_sf_client_layer_use_afbc_format_by_size(const int buffer_size)
+static bool should_sf_client_layer_use_afbc_format_by_size(const uint64_t base_format, const int buffer_size)
 {
 	int fb_size = get_fb_size();
+
+        /* 若格式 "不是" rgba_8888, 则 */
+        if ( MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888 != base_format )
+        {
+                /* 将使用 AFBC 格式, 即 不参与 use_non_afbc_for_small_buffers. */
+                return true;
+        }
 
 	/* 若有 属性要求 禁用 use_non_afbc_for_small_buffers , 则... */
 	if ( is_not_to_use_non_afbc_for_small_buffers_required_via_prop() )
@@ -1855,7 +1862,8 @@ static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 							&& internal_format != MALI_GRALLOC_FORMAT_INTERNAL_P010
 							&& internal_format != MALI_GRALLOC_FORMAT_INTERNAL_RGBA_16161616
 							&& internal_format != MALI_GRALLOC_FORMAT_INTERNAL_NV16
-							&& should_sf_client_layer_use_afbc_format_by_size(buffer_size) )
+							&& should_sf_client_layer_use_afbc_format_by_size(internal_format,
+                                                                                                          buffer_size) )
 						{
 							/* 强制将 'internal_format' 设置为对应的 AFBC 格式. */
 							internal_format = internal_format | MALI_GRALLOC_INTFMT_AFBC_BASIC;

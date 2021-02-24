@@ -1815,10 +1815,18 @@ static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 				break;
 
 			case RK356X:
-				I("to allocate AFBC buffer for fb_target_layer on rk356x.");
-				internal_format = 
-					MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888
-					| MALI_GRALLOC_INTFMT_AFBC_BASIC;
+                                if ( 0 == (usage & MALI_GRALLOC_USAGE_NO_AFBC) )
+                                {
+				    I("to allocate AFBC buffer for fb_target_layer on rk356x.");
+				    internal_format = 
+                                            MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888
+					    | MALI_GRALLOC_INTFMT_AFBC_BASIC;
+                                }
+                                else
+                                {
+                                    I("to allocate non AFBC buffer for fb_target_layer on rk356x.");
+                                    internal_format = MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888;
+                                }
 				break;
 
 			default:

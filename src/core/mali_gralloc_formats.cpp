@@ -1833,8 +1833,6 @@ static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 				LOG_ALWAYS_FATAL("unexpected 'platform' : %d", platform);
 				break;
 			}
-
-			property_set("vendor.gmali.fbdc_target", "1"); // 继续遵循 rk_drm_gralloc 和 rk_drm_hwc 的约定.
 		}
 		else	// if ( !should_disable_afbc_in_fb_target_layer() )
 		{

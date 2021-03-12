@@ -1611,6 +1611,7 @@ static bool is_no_afbc_for_fb_target_layer_required_via_prop()
 
 #define PROP_NAME_OF_FB_SIZE	"vendor.gralloc.fb_size"
 
+static int get_fb_size(void);
 /* framebuffer resolution (w x h, in pixels). */
 static int s_fb_size;
 
@@ -1622,14 +1623,14 @@ static int s_fb_size;
  * rk_gralloc_select_format() 的行为 依赖 fb_size.
  * 也即, fb_size 必须被 跨进程地, 全局地保存.
  */
-void save_fb_size(int fb_size)
+static void save_fb_size(int fb_size)
 {
 	char fb_size_in_str[PROPERTY_VALUE_MAX];
 
-	if ( s_fb_size != 0 )
-	{
-		return;
-	}
+        if ( get_fb_size() != 0 )
+        {
+	        return;
+        }
 
 	s_fb_size = fb_size;
 
@@ -1637,7 +1638,7 @@ void save_fb_size(int fb_size)
 	property_set(PROP_NAME_OF_FB_SIZE, fb_size_in_str);
 }
 
-int get_fb_size(void)
+static int get_fb_size(void)
 {
 	char fb_size_in_str[PROPERTY_VALUE_MAX];
 

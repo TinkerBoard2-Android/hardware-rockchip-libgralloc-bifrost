@@ -1804,35 +1804,44 @@ static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 	{
 		if ( !is_no_afbc_for_fb_target_layer_required_via_prop() )
 		{
-			rk_board_platform_t platform = get_rk_board_platform();
-			switch ( platform )
+			/* 若当前 buffer_of_fb_target_layer 还将被送如 video_decoder, 则... */
+			if ( GRALLOC_USAGE_HW_VIDEO_ENCODER == (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER ) )
 			{
-			case RK3326:
-				I("to allocate AFBC buffer for fb_target_layer on rk3326.");
-				internal_format = 
-					MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888
-					| MALI_GRALLOC_INTFMT_AFBC_BASIC
-					| MALI_GRALLOC_INTFMT_AFBC_YUV_TRANSFORM;
-				break;
+				D("not to use AFBC for buffer_of_fb_target_layer that would be inputed into video_encoder.");
+			}
+			/* 否则, ... */
+			else
+			{
+				rk_board_platform_t platform = get_rk_board_platform();
+				switch ( platform )
+				{
+				case RK3326:
+					I("to allocate AFBC buffer for fb_target_layer on rk3326.");
+					internal_format = 
+						MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888
+						| MALI_GRALLOC_INTFMT_AFBC_BASIC
+						| MALI_GRALLOC_INTFMT_AFBC_YUV_TRANSFORM;
+					break;
 
-			case RK356X:
-                                if ( 0 == (usage & MALI_GRALLOC_USAGE_NO_AFBC) )
-                                {
-				    I("to allocate AFBC buffer for fb_target_layer on rk356x.");
-				    internal_format = 
-                                            MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888
-					    | MALI_GRALLOC_INTFMT_AFBC_BASIC;
-                                }
-                                else
-                                {
-                                    I("to allocate non AFBC buffer for fb_target_layer on rk356x.");
-                                    internal_format = MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888;
-                                }
-				break;
+				case RK356X:
+					if ( 0 == (usage & MALI_GRALLOC_USAGE_NO_AFBC) )
+					{
+					    I("to allocate AFBC buffer for fb_target_layer on rk356x.");
+					    internal_format = 
+						    MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888
+						    | MALI_GRALLOC_INTFMT_AFBC_BASIC;
+					}
+					else
+					{
+					    I("to allocate non AFBC buffer for fb_target_layer on rk356x.");
+					    internal_format = MALI_GRALLOC_FORMAT_INTERNAL_RGBA_8888;
+					}
+					break;
 
-			default:
-				LOG_ALWAYS_FATAL("unexpected 'platform' : %d", platform);
-				break;
+				default:
+					LOG_ALWAYS_FATAL("unexpected 'platform' : %d", platform);
+					break;
+				}
 			}
 		}
 		else	// if ( !should_disable_afbc_in_fb_target_layer() )

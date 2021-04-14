@@ -190,6 +190,11 @@ typedef enum
 	 */
 	RK_GRALLOC_USAGE_SPECIFY_STRIDE = GRALLOC_USAGE_PRIVATE_2,
 
+	/* 表征 "调用 alloc() 的 client 要求分配 底层 pages 是物理连续的 buffer".
+     * 目前的实现从 ion_cma_heap 分配.
+	 */
+	RK_GRALLOC_USAGE_PHY_CONTIG_BUFFER = GRALLOC_USAGE_PRIVATE_3,
+
 	/* See comment for Gralloc 1.0, above. */
 	MALI_GRALLOC_USAGE_FRONTBUFFER = GRALLOC_USAGE_PRIVATE_0,
 

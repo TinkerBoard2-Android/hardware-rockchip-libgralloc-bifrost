@@ -156,32 +156,26 @@ static void set_ion_flags(enum ion_heap_type heap_type, uint64_t usage,
                           unsigned int *priv_heap_flag, unsigned int *ion_flags)
 {
 #if !defined(GRALLOC_USE_ION_DMA_HEAP) || !GRALLOC_USE_ION_DMA_HEAP
-	GRALLOC_UNUSED(heap_type);
+	// GRALLOC_UNUSED(heap_type);
 #endif
 
 	if (priv_heap_flag)
 	{
-#if defined(GRALLOC_USE_ION_DMA_HEAP) && GRALLOC_USE_ION_DMA_HEAP
 		if (heap_type == ION_HEAP_TYPE_DMA)
 		{
 			*priv_heap_flag = private_handle_t::PRIV_FLAGS_USES_ION_DMA_HEAP;
 		}
-#endif
 	}
 
 	if (ion_flags)
 	{
-#if defined(GRALLOC_USE_ION_DMA_HEAP) && GRALLOC_USE_ION_DMA_HEAP
 		if (heap_type != ION_HEAP_TYPE_DMA)
 		{
-#endif
 			if ((usage & GRALLOC_USAGE_SW_READ_MASK) == GRALLOC_USAGE_SW_READ_OFTEN)
 			{
 				*ion_flags = ION_FLAG_CACHED | ION_FLAG_CACHED_NEEDS_SYNC;
 			}
-#if defined(GRALLOC_USE_ION_DMA_HEAP) && GRALLOC_USE_ION_DMA_HEAP
 		}
-#endif
 	}
 }
 
@@ -316,11 +310,9 @@ int ion_device::alloc_from_ion_heap(uint64_t usage, size_t size, enum ion_heap_t
 
 	case ION_HEAP_TYPE_SYSTEM_CONTIG:
 	case ION_HEAP_TYPE_CARVEOUT:
-#if defined(GRALLOC_USE_ION_DMA_HEAP) && GRALLOC_USE_ION_DMA_HEAP
 	case ION_HEAP_TYPE_DMA:
 		*min_pgsz = size;
 		break;
-#endif
 #if defined(GRALLOC_USE_ION_COMPOUND_PAGE_HEAP) && GRALLOC_USE_ION_COMPOUND_PAGE_HEAP
 	case ION_HEAP_TYPE_COMPOUND_PAGE:
 		*min_pgsz = SZ_2M;
@@ -354,6 +346,10 @@ enum ion_heap_type ion_device::pick_ion_heap(uint64_t usage)
 		{
 			MALI_GRALLOC_LOGE("Protected ION memory is not supported on this platform.");
 		}
+	}
+	else if ( usage & RK_GRALLOC_USAGE_PHY_CONTIG_BUFFER )
+	{
+		heap_type = ION_HEAP_TYPE_DMA; // for ion_cma_heap
 	}
 	else if (!(usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) && (usage & GRALLOC_USAGE_HW_FB))
 	{

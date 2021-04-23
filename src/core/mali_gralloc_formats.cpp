@@ -1804,10 +1804,26 @@ static uint64_t rk_gralloc_select_format(const uint64_t req_format,
 	{
 		if ( !is_no_afbc_for_fb_target_layer_required_via_prop() )
 		{
-			/* 若当前 buffer_of_fb_target_layer 还将被送如 video_decoder, 则... */
-			if ( GRALLOC_USAGE_HW_VIDEO_ENCODER == (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER ) )
+			/* 若当前 buffer_of_fb_target_layer 还将被送入 video_decoder,
+			 *	或 被显式要求禁用 AFBC,
+			 *	或 会被 CPU 一侧读写,
+			 *	或 会被 camera 读写,
+			 *	或 'internal_format' 是 若干特定格式,
+			 * 则, 将不使用 AFBC 格式.
+			 */
+			if ( (GRALLOC_USAGE_HW_VIDEO_ENCODER == (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) )
+				|| (MALI_GRALLOC_USAGE_NO_AFBC == (usage & MALI_GRALLOC_USAGE_NO_AFBC) )
+				|| (0 != (usage & (GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK) ) )
+				|| (GRALLOC_USAGE_HW_CAMERA_WRITE == (usage & GRALLOC_USAGE_HW_CAMERA_WRITE) )
+				|| (GRALLOC_USAGE_HW_CAMERA_READ == (usage & GRALLOC_USAGE_HW_CAMERA_READ) )
+				|| (internal_format == MALI_GRALLOC_FORMAT_INTERNAL_NV12)
+				|| (internal_format == MALI_GRALLOC_FORMAT_INTERNAL_P010)
+				|| (internal_format == MALI_GRALLOC_FORMAT_INTERNAL_RGBA_16161616)
+				|| (internal_format == MALI_GRALLOC_FORMAT_INTERNAL_NV16) )
 			{
-				D("not to use AFBC for buffer_of_fb_target_layer that would be inputed into video_encoder.");
+				D("not to use AFBC for buffer_of_fb_target_layer with usage('0x%" PRIx64 "') and  internal_format('0x%" PRIx64 "').",
+				  usage,
+				  internal_format);
 			}
 			/* 否则, ... */
 			else
